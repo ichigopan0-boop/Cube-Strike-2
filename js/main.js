@@ -130,6 +130,12 @@
         st.mapName = 'トーナメント ' + (room.tourney ? room.tourney.n + '人' : '');
         delete st.rule;
       }
+      /* CS2: みんなで ボスレイド */
+      if (room.mode === 'raid' && CS.Raid) {
+        const r = CS.Raid.cleanCfg(room.raid);
+        st.mapName = 'ボスレイド ' + CS.Raid.bossOf(r.boss).name;
+        delete st.rule;
+      }
       /* v5: みんなで クリスタルまもり */
       if (room.mode === 'defense') {
         const DF = CS.Defense, d = room.defense;
@@ -190,6 +196,16 @@
       if (!game.startDefense || !game.startDefense(opt || {})) { CS.UI.toast('いま クリスタルまもりを はじめられません'); return; }
       startPlay();
     },
+    /* CS2: ボスレイド（ひとりで＋コンピューターの なかま）。opt = {boss, diff, ally} */
+    raid: function (opt) {
+      CS.Audio.init();
+      joinPending = createPending = false;
+      menuOpen = false;
+      if (!game.startRaid || !game.startRaid(opt || {})) { CS.UI.toast('いま ボスレイドを はじめられません'); return; }
+      startPlay();
+    },
+    /* CS2: ホストだけ: ボスレイドの へやの せってい */
+    roomRaid: function (cfg) { game.setRoomRaid(cfg); },
     /* 塔のぼり。opt = {diff} */
     tower: function (opt) {
       CS.Audio.init();

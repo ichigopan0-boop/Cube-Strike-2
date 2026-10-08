@@ -1237,10 +1237,16 @@
   function nameOfGun(id) { const g = CS.GunMap && CS.GunMap[id]; return g ? (g.short || g.name) : (id || '—'); }
   function nameOfBomb(id) { const b = CS.BombMap && CS.BombMap[id]; return b ? b.name : (id || '—'); }
 
-  const MODE_PER = { '1v1': 1, '2v2': 2, '3v3': 3, 'tower': 4, 'defense': 4, 'tourney': 8 };
+  const MODE_PER = { '1v1': 1, '2v2': 2, '3v3': 3, 'tower': 4, 'defense': 4, 'tourney': 8, 'raid': 4 };
   function perTeam(mode) { return MODE_PER[mode] || 1; }
   function modeLabel(mode) {
-    return mode === 'tower' ? 'みんなで塔のぼり' : mode === 'defense' ? 'みんなで クリスタルまもり' : mode === 'tourney' ? 'みんなで トーナメント' : perTeam(mode) + '対' + perTeam(mode);
+    return mode === 'tower' ? 'みんなで塔のぼり' : mode === 'defense' ? 'みんなで クリスタルまもり' : mode === 'tourney' ? 'みんなで トーナメント' : mode === 'raid' ? 'みんなで ボスレイド' : perTeam(mode) + '対' + perTeam(mode);
+  }
+  function raidText(o) {
+    const R = CS.Raid, r = o && o.raid;
+    if (!R || !r) return '';
+    const c = R.cleanCfg(r);
+    return 'ボス: ' + R.bossOf(c.boss).name + ' ・ ' + R.diffOf(c.diff).name + (c.ally ? ' ・ CPUのなかま ' + c.ally + '人' : '');
   }
   function defDiffName(o) { const DF = CS.Defense, d = o && o.defense; return DF && d ? DF.diffOf(d.diff).name : 'ふつう'; }
   function defMapName(o) { const d = o && o.defense, m = d && CS.Maps && CS.Maps.get(d.map); return m ? m.name : ''; }
@@ -1300,11 +1306,11 @@
     lobbyCode = code;
 
     const per = perTeam(o.mode);
-    const defense = o.mode === 'defense', tourney = o.mode === 'tourney';
-    const tower = o.mode === 'tower' || defense || tourney;      // みんなで（塔のぼり・クリスタルまもり・トーナメント）: 1つの ならび
+    const defense = o.mode === 'defense', tourney = o.mode === 'tourney', raid = o.mode === 'raid';
+    const tower = o.mode === 'tower' || defense || tourney || raid;      // みんなで（塔のぼり・クリスタルまもり・トーナメント・ボスレイド）: 1つの ならび
     const mapDef = (CS.Maps && CS.Maps.get) ? CS.Maps.get(o.mapId) : null;
     const mapName = o.mapName || (mapDef && mapDef.name) || o.mapId || 'マップ';
-    const rt = tourney ? (CS.Tourney ? CS.Tourney.describe(o.tourney) : '') : defense ? 'むずかしさ: ' + defDiffName(o) : tower ? 'むずかしさ: ' + towerDiffName(o) : ruleText(o.rule);
+    const rt = tourney ? (CS.Tourney ? CS.Tourney.describe(o.tourney) : '') : raid ? raidText(o) : defense ? 'むずかしさ: ' + defDiffName(o) : tower ? 'むずかしさ: ' + towerDiffName(o) : ruleText(o.rule);
     const where = tourney ? '8人まで' : defense ? defMapName(o) + ' ・ 4人まで' : tower ? '4人まで' : mapName;
     /* v5.3: ランダムマッチ（ルールは きまり・じゅんびは じどう・そろったら じどうで はじまる） */
     const ranked = !!o.ranked;
@@ -1410,7 +1416,7 @@
       bStart.style.display = '';
       bStart.disabled = !o.canStart;
       const sTxt = tourney ? (o.canStart ? 'トーナメント開始！' : 'ぜんいん じゅんびOK で はじめられます')
-        : defense ? (o.canStart ? 'スタート！' : 'ぜんいん じゅんびOK で はじめられます')
+        : defense || raid ? (o.canStart ? 'スタート！' : 'ぜんいん じゅんびOK で はじめられます')
         : tower ? (o.canStart ? 'のぼる！' : 'ぜんいん じゅんびOK で のぼれます') : (o.canStart ? 'しあい開始！' : 'ぜんいん そろうと押せます');
       if (bStart._m !== sTxt) { bStart._m = sTxt; bStart.textContent = sTxt; }
     } else {

@@ -298,7 +298,8 @@
         hh = Math.imul(hh ^ (hh >>> 13), 0x5bd1e995); hh ^= hh >>> 15;
         const tint = 1 + (((hh >>> 8) & 255) / 255 - 0.5) * 0.08;
         const r = base[0] * tint, g = base[1] * tint, b = base[2] * tint;
-        const glow = id === GLOW, e = glow ? 1 : 0;
+        /* CS2: 30〜39 は いろいろな 色の ネオン（光る） */
+        const glow = id === GLOW || (id >= 30 && id < 40), e = glow ? 1 : 0;
 
         for (let f = 0; f < 6; f++) {
           const F = FACES[f];
