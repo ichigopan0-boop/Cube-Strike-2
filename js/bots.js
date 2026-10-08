@@ -445,11 +445,13 @@
       if (!cfg.fire) { this.mode = 'flee'; return; }
       const rh = this._retreatHp(view);
       if (rh > 0 && typeof self.hp === 'number') {
+        /* CS2: 体力は 200 など。100 を まんたんと した わりあいで くらべる */
+        const hp = self.hp * 100 / (self.maxHp > 0 ? self.maxHp : 100);
         if (!this.retreat) {
-          if (self.hp > 0 && self.hp < rh && !self.protect && (this.tgtVis || now - this.hurtT < 4)) {
+          if (hp > 0 && hp < rh && !self.protect && (this.tgtVis || now - this.hurtT < 4)) {
             this.retreat = true; this.retreatT = now; this.planT = -99; this.path = null;
           }
-        } else if (self.hp >= Math.min(100, rh + 35) || now - this.retreatT > 9) {
+        } else if (hp >= Math.min(100, rh + 35) || now - this.retreatT > 9) {
           this.retreat = false;
         }
       }

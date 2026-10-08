@@ -43,7 +43,7 @@
     const s = LV_STEPS[diff] || LV_STEPS.normal;
     return w <= s[0] ? 'easy' : w <= s[1] ? 'normal' : 'hard';
   };
-  const waveHp = (w, n, D) => Math.round(100 * D.hp * (1 + 0.1 * (w - 1)) * (1 + 0.25 * (n - 1)));
+  const waveHp = (w, n, D) => Math.round(CS.RULES.hp * D.hp * (1 + 0.1 * (w - 1)) * (1 + 0.25 * (n - 1)));
   const waveDmg = (w, D) => D.dmg * (1 + 0.05 * (w - 1));
 
   function diffOf(id) { return DIFFS[id] || DIFFS.normal; }
@@ -65,7 +65,7 @@
     this.isHost = true;
     this.myNetId = 'host';
     this.offline = true;
-    const humans = [{ id: 'host', name: String(CS.Settings.name || 'プレイヤー'), gun: this._myGunId(), gun2: this._myGun2Id(), bomb: this._myBombId(), skin: this._mySkin(), fc: '' }];
+    const humans = [{ id: 'host', name: String(CS.Settings.name || 'プレイヤー'), gun: this._myGunId(), gun2: this._myGun2Id(), gm: this._myGm(), gm2: this._myGm2(), bomb: this._myBombId(), skin: this._mySkin(), fc: '' }];
     this._defStartWith(humans, diffOf(opt.diff).id, mapOk(opt.map), false);
     return true;
   };
@@ -75,7 +75,7 @@
     if (!CS.Bots || !this.isHost || !this.room) return false;
     const r = this.room.defense || {};
     const humans = this.room.players.filter((p) => !p.bot).slice(0, MAX_N).map((p) => ({
-      id: p.id, name: p.name, gun: p.gun, gun2: p.gun2 || '', bomb: p.bomb, skin: p.skin || null, fc: p.fc || ''
+      id: p.id, name: p.name, gun: p.gun, gun2: p.gun2 || '', gm: p.gm || '', gm2: p.gm2 || '', bomb: p.bomb, skin: p.skin || null, fc: p.fc || ''
     }));
     if (!humans.length) return false;
     this.offline = false;
@@ -88,7 +88,7 @@
     const rg = CS.rng((seed ^ 0x51ed27) >>> 0);
     const players = [], spawns = [], slot = [0, 0];
     const add = (pd) => { players.push(pd); spawns.push(slot[pd.team]++); };
-    for (const h of humans) add({ id: h.id, name: h.name, team: 0, gun: h.gun, gun2: h.gun2 || '', bomb: h.bomb, skin: h.skin || null, fc: h.fc || '' });
+    for (const h of humans) add({ id: h.id, name: h.name, team: 0, gun: h.gun, gun2: h.gun2 || '', gm: h.gm || '', gm2: h.gm2 || '', bomb: h.bomb, skin: h.skin || null, fc: h.fc || '' });
     for (let i = 0; i < POOL; i++) {
       const lo = CS.Bots.randomLoadout(rg);
       const skin = CS.Skins ? CS.Skins.random(rg, { teamColor: true, noPattern: true }) : null;

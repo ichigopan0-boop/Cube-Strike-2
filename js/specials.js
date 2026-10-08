@@ -43,6 +43,7 @@
     muzzle: [0, 0.015, -0.70],
     stats: { power: 5, rate: 5, range: 5, mobility: 3, ease: 5 }
   });
+  if (CS.Weapons.bulletize) CS.Weapons.bulletize(SPMG);       // CS2: 弾は とんでいく
   CS.GunMap[SPMG.id] = SPMG;
 
   /* ---------- v5: 戦車の 大砲（必殺技「せんしゃ」のあいだ だけ。弾は むげん・じぶんは ばくふうで けがしない） ---------- */

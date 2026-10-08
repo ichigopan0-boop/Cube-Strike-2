@@ -323,7 +323,7 @@
       const players = [], spawns = [];
       const side = (idx, team) => {
         const P = T.people[idx], q = P.hid ? rec(P.hid) : null;
-        if (q) players.push({ id: q.id, name: q.name, team: team, gun: q.gun, gun2: q.gun2 || '', bomb: q.bomb, fc: q.fc || '', skin: q.skin || null });
+        if (q) players.push({ id: q.id, name: q.name, team: team, gun: q.gun, gun2: q.gun2 || '', gm: q.gm || '', gm2: q.gm2 || '', bomb: q.bomb, fc: q.fc || '', skin: q.skin || null });
         else {
           const skin = CS.Skins ? CS.Skins.random(Math.random, { teamColor: true, noPattern: true }) : null;
           players.push({ id: 'tc' + idx, name: P.name, team: team, gun: P.gun, gun2: '', bomb: P.bomb, skin: skin, bot: P.lv || 'normal' });
@@ -335,7 +335,7 @@
       let k = 1;
       for (const q of room.players) {
         if (q.bot || players.some((p) => p.id === q.id)) continue;
-        players.push({ id: q.id, name: q.name, team: 0, gun: q.gun, gun2: q.gun2 || '', bomb: q.bomb, fc: q.fc || '', skin: q.skin || null, spec: 1 });
+        players.push({ id: q.id, name: q.name, team: 0, gun: q.gun, gun2: q.gun2 || '', gm: q.gm || '', gm2: q.gm2 || '', bomb: q.bomb, fc: q.fc || '', skin: q.skin || null, spec: 1 });
         spawns.push(k++);
       }
       room.started = true;

@@ -387,7 +387,7 @@
     this.myNetId = 'host';
     this.offline = true;
     this.tower = this._towerNewRun(diff, false, [{
-      id: 'host', name: String(CS.Settings.name || 'プレイヤー'), gun: this._myGunId(), gun2: this._myGun2Id(), bomb: this._myBombId(),
+      id: 'host', name: String(CS.Settings.name || 'プレイヤー'), gun: this._myGunId(), gun2: this._myGun2Id(), gm: this._myGm(), gm2: this._myGm2(), bomb: this._myBombId(),
       skin: this._mySkin(), fc: ''
     }]);
     this._towerFloor();
@@ -399,7 +399,7 @@
     if (!CS.Bots || typeof CS.Bots.create !== 'function' || !this.isHost || !this.room) return false;
     const D = this.room.tower && DIFFS[this.room.tower.diff] ? this.room.tower.diff : 'normal';
     const humans = this.room.players.slice(0, MAX_N).map((p) => ({
-      id: p.id, name: p.name, gun: p.gun, gun2: p.gun2 || '', bomb: p.bomb, skin: p.skin || null, fc: p.fc || ''
+      id: p.id, name: p.name, gun: p.gun, gun2: p.gun2 || '', gm: p.gm || '', gm2: p.gm2 || '', bomb: p.bomb, skin: p.skin || null, fc: p.fc || ''
     }));
     if (!humans.length) return false;
     this.offline = false;
@@ -440,7 +440,7 @@
 
     const players = [], spawns = [], slot = [0, 0];
     const add = (pd) => { players.push(pd); spawns.push(slot[pd.team]++); };
-    for (const h of humans) add({ id: h.id, name: h.name, team: 0, gun: h.gun, gun2: h.gun2 || '', bomb: h.bomb, skin: h.skin || null, fc: h.fc || '' });
+    for (const h of humans) add({ id: h.id, name: h.name, team: 0, gun: h.gun, gun2: h.gun2 || '', gm: h.gm || '', gm2: h.gm2 || '', bomb: h.bomb, skin: h.skin || null, fc: h.fc || '' });
     const rg = CS.rng(((run.seed ^ Math.imul(run.floor, 97)) >>> 0));
     const guns = run.floor < 8 ? EARLY_GUNS : LATE_GUNS;
     const skin = enemySkin(run.floor, false);
@@ -530,7 +530,7 @@
   G._towerDefs = function (pd) {
     const run = this.tower;
     if (!run) return null;
-    const gun = CS.Weapons.gun(pd.gun), bomb = CS.Weapons.bomb(pd.bomb);
+    const gun = pd.npc ? CS.Weapons.gun(pd.gun) : CS.gunWith(pd.gun, CS.cleanMods(pd.gm, pd.gun)), bomb = CS.Weapons.bomb(pd.bomb);
     if (pd.npc) {
       const em = { dmg: clamp(num(pd.dm) || 1, 0.1, 5) };
       return {
@@ -540,7 +540,7 @@
     }
     const m = run.mods;
     return {
-      base: { gunDef: modGun(gun, m), gun2Def: pd.gun2 && CS.GunMap[pd.gun2] ? modGun(CS.Weapons.gun(pd.gun2), m) : null, bombDef: modBomb(bomb, m), maxHp: RULES.hp + m.hp },
+      base: { gunDef: modGun(gun, m), gun2Def: CS.cleanGun2(pd.gun2, pd.gun) ? modGun(CS.gunWith(pd.gun2, CS.cleanMods(pd.gm2, pd.gun2)), m) : null, bombDef: modBomb(bomb, m), maxHp: RULES.hp + m.hp },
       extra: { armor: m.armor, healOnKill: m.heal, jumpMul: m.jump, regenDelay: m.regenDelay, regenRate: m.regenRate, spMul: m.spGain || 1 }
     };
   };

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>CUBE STRIKE キューブストライク</title>
+<title>CUBE STRIKE 2 キューブストライク2</title>
 <meta name="description" content="ブロックになって転がって撃ち合う、チーム対戦FPS。コードを送れば友達とすぐ遊べる。1対1〜3対3・4つのルール・コンピューター対戦・ひとりで挑む塔のぼり・スキン作り・フレンド・マップエディターも。スマホ・タブレット・PC対応。">
 <meta name="theme-color" content="#04060f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -77,6 +77,7 @@ select{font-family:inherit;font-size:15px;padding:9px 12px;border-radius:10px;mi
   position:relative;transform:rotate(-8deg)}
 .logo .cb::before,.logo .cb::after{content:"";position:absolute;top:.2em;width:.1em;height:.14em;background:#fff;border-radius:.02em;box-shadow:0 0 .12em #fff}
 .logo .cb::before{left:.16em}.logo .cb::after{right:.16em}
+.logo .two{display:inline-block;margin-left:.12em;padding:0 .14em;border-radius:.12em;color:#fff;background:linear-gradient(135deg,#ff5ea8,#7f5cff);-webkit-text-fill-color:#fff;box-shadow:0 0 .3em rgba(255,94,168,.6);font-size:.8em;vertical-align:.08em}
 @keyframes logoGlow{0%,100%{filter:drop-shadow(0 0 18px rgba(90,170,255,.45))}50%{filter:drop-shadow(0 0 34px rgba(255,94,168,.55))}}
 .kana{font-size:clamp(11px,2.8vw,14px);letter-spacing:.62em;color:#86b2e0;margin:2px 0 0 .62em;font-weight:600}
 .titleLead{font-size:clamp(13px,3.4vw,15.5px);line-height:1.9;color:#bcd0ea;max-width:430px;margin:4px 0 2px}
@@ -936,9 +937,9 @@ body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
     <div class="roller" style="--s:18px;--c:#ff5ea8;--delay:-24s"><i></i></div>
   </div>
   <div class="panel">
-    <h1 class="logo" aria-label="CUBE STRIKE">CU<span class="cb"></span>E STRIKE</h1>
-    <div class="kana">キ ュ ー ブ ス ト ラ イ ク</div>
-    <p class="titleLead">ブロックになって<b>転がって撃ち合う</b>、チーム対戦FPS。<br>コードを送れば友達とすぐ遊べる。<b>コンピューター</b>とも戦える！</p>
+    <h1 class="logo" aria-label="CUBE STRIKE 2">CU<span class="cb"></span>E STRIKE <span class="two">2</span></h1>
+    <div class="kana">キ ュ ー ブ ス ト ラ イ ク ２</div>
+    <p class="titleLead">ブロックになって<b>転がって撃ち合う</b>、チーム対戦FPS の 続編！<br>銃は <b>57しゅるい</b>・<b>部品</b>で 自分だけの銃に。みんなで <b>ボスレイド</b>にも いどもう！</p>
     <div class="nameRow"><label for="inName">なまえ</label><input id="inName" type="text" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="なまえ"></div>
     <div class="stack">
       <button id="btnCreate" class="btn big pink" type="button">へやを作る</button>
@@ -1521,6 +1522,8 @@ body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
 <script src="js/custommaps.js?v=20"></script>
 <script src="js/stages.js?v=20"></script>
 <script src="js/weapons.js?v=20"></script>
+<script src="js/weapons2.js?v=20"></script>
+<script src="js/parts.js?v=20"></script>
 <script src="js/bots.js?v=20"></script>
 <script src="js/render.js?v=20"></script>
 <script src="js/audio.js?v=20"></script>

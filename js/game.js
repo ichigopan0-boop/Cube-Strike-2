@@ -179,23 +179,45 @@
     return c.length === CS.Friends.LEN ? c : '';
   }
   const cleanSkin = (s) => (CS.Skins ? CS.Skins.clean(s) : null);
-  /* v5: 2つめの銃の id（ない・必殺技の銃・メインと おなじ なら ''） */
+  /* v5: 2つめの銃の id（ない・必殺技の銃 なら ''）。
+     CS2: メインと おなじ銃でも よい（部品を かえられる）。スナイパー系（solo）を もつなら 2つめは もてない */
   function cleanGun2(id, main) {
     const g = typeof id === 'string' && CS.GunMap ? CS.GunMap[id] : null;
-    return g && !g.special && g.id !== main ? g.id : '';
+    const m = typeof main === 'string' && CS.GunMap ? CS.GunMap[main] : null;
+    if (!g || g.special || g.solo || (m && m.solo)) return '';
+    return g.id;
   }
+  /* CS2: 部品の きろく（正しい形に。銃に つけられない 部品は すてる） */
+  function cleanMods(str, gunId) {
+    if (!CS.Parts || typeof str !== 'string' || !str || !gunId) return '';
+    return CS.Parts.clean(str, CS.Weapons.gun(gunId));
+  }
+  /* CS2: 部品つきの 銃（部品なしなら もとの 定義） */
+  function gunWith(id, mods) {
+    const g = CS.Weapons.gun(id);
+    return CS.Parts && mods ? CS.Parts.build(g, mods) : g;
+  }
+  CS.gunWith = gunWith;
+  CS.cleanGun2 = cleanGun2;
+  CS.cleanMods = cleanMods;
 
   /* ======================================================================
      プレイヤー記録
      pd.gunDef / pd.bombDef を渡すと その定義（塔のぼりのパワーアップ入りのコピー）を使う
      ====================================================================== */
   function makePlayer(pd) {
-    const gun = pd.gunDef || CS.Weapons.gun(pd.gun), bomb = pd.bombDef || CS.Weapons.bomb(pd.bomb);
-    /* v5: 2つめの銃（ない・メインと おなじ なら null）。guns[slot] が いま もっている銃 */
+    /* CS2: コンピューターは 部品なし */
+    const gm = pd.bot ? '' : cleanMods(pd.gm, pd.gun), gm2 = pd.bot ? '' : cleanMods(pd.gm2, pd.gun2);
+    const gun = pd.gunDef || gunWith(pd.gun, gm), bomb = pd.bombDef || CS.Weapons.bomb(pd.bomb);
+    /* v5: 2つめの銃（ない なら null）。guns[slot] が いま もっている銃 */
     const g2id = cleanGun2(pd.gun2, gun.id);
-    const gun2 = g2id ? (pd.gun2Def || CS.Weapons.gun(g2id)) : null;
-    const maxHp = pd.maxHp > 0 ? pd.maxHp : RULES.hp;
+    const gun2 = g2id ? (pd.gun2Def || gunWith(g2id, gm2)) : null;
+    /* CS2: 部品の からだに つく こうか（HP・回復しない・うける ダメージ） */
+    const pm = CS.Parts ? CS.Parts.playerMods(gun2 ? [gun, gun2] : [gun]) : { hpMul: 1, hpAdd: 0, noRegen: false, takeMul: 1 };
+    const maxHp = Math.max(1, Math.round(((pd.maxHp > 0 ? pd.maxHp : RULES.hp) + pm.hpAdd) * pm.hpMul));
     return {
+      noRegen: !!pm.noRegen, takeMul: pm.takeMul > 0 ? pm.takeMul : 1,
+      fx: { slow: 0, slowMul: 1, guard: 0, guardMul: 1, pow: 0, powMul: 1, spd: 0, spdMul: 1 },
       idx: pd.idx | 0, id: pd.id, name: clipName(pd.name), team: (pd.team | 0) === 1 ? 1 : 0,
       gun: gun, bomb: bomb, gunId: gun.id, bombId: bomb.id,
       guns: gun2 ? [gun, gun2] : [gun], slot: 0,
@@ -298,6 +320,7 @@
       this.projectiles = [];
       this.bombs = [];
       this.smokes = [];
+      this.fields = [];              // CS2: ブラックホール
       this.beam = null;
       this.projSeq = 0;
       this.bombSeq = 0;
@@ -404,7 +427,7 @@
         rule: CS.cleanRule(opts.rule),
         players: [{
           id: 'host', name: clipName(CS.Settings.name), team: 0,
-          gun: this._myGunId(), gun2: this._myGun2Id(), bomb: this._myBombId(), ready: false, ping: 0,
+          gun: this._myGunId(), gun2: this._myGun2Id(), gm: this._myGm(), gm2: this._myGm2(), bomb: this._myBombId(), ready: false, ping: 0,
           fc: this._myFc(), skin: this._mySkin()
         }]
       };
@@ -458,7 +481,8 @@
             self._broadcastLobby();
           } else {
             net.send({
-              t: 'hello', v: CS.VERSION, name: clipName(CS.Settings.name), gun: self._myGunId(), gun2: self._myGun2Id(), bomb: self._myBombId(),
+              t: 'hello', v: CS.VERSION, name: clipName(CS.Settings.name), gun: self._myGunId(), gun2: self._myGun2Id(),
+              gm: self._myGm(), gm2: self._myGm2(), bomb: self._myBombId(),
               fc: self._myFc(), skin: self._mySkin()
             });
             self._emit('roomOpen', net.code);
@@ -480,6 +504,9 @@
 
     _myGunId() { const g = CS.Weapons.gun(CS.Settings.gun); return g.id; }
     _myGun2Id() { return cleanGun2(CS.Settings.gun2, this._myGunId()); }
+    /* CS2: じぶんの 部品 */
+    _myGm() { return cleanMods(CS.Settings.gm, this._myGunId()); }
+    _myGm2() { const g2 = this._myGun2Id(); return g2 ? cleanMods(CS.Settings.gm2, g2) : ''; }
     _myBombId() { const b = CS.Weapons.bomb(CS.Settings.bomb); return b.id; }
     _myFc() { return CS.Friends && CS.Friends.hub ? CS.Friends.hub.code : ''; }
     _mySkin() { return CS.Skins ? CS.Skins.mine() : null; }
@@ -516,11 +543,11 @@
     _idxOf(id) { const p = this._byNetId(id); return p ? p.idx : -1; }
 
     /* ---- ロビー操作 ---- */
-    setLoadout(gunId, bombId, gun2Id) {
+    setLoadout(gunId, bombId, gun2Id, gm, gm2) {
       if (this.mode === 'match' || this.mode === 'practice') return;   // しあい中は変えられない
       if (!this.net || !this.room) return;
-      const gid = CS.Weapons.gun(gunId).id;
-      const m = { t: 'set', gun: gid, gun2: cleanGun2(gun2Id, gid), bomb: CS.Weapons.bomb(bombId).id };
+      const gid = CS.Weapons.gun(gunId).id, g2 = cleanGun2(gun2Id, gid);
+      const m = { t: 'set', gun: gid, gun2: g2, gm: cleanMods(gm, gid), gm2: g2 ? cleanMods(gm2, g2) : '', bomb: CS.Weapons.bomb(bombId).id };
       if (this.isHost) this._hostSet('host', m); else this.net.send(m);
     }
 
@@ -617,7 +644,7 @@
       const players = [], spawns = [];
       for (let i = 0; i < order.length; i++) {
         const p = order[i];
-        players.push({ id: p.id, idx: i, name: p.name, team: p.team, gun: p.gun, gun2: p.gun2 || '', bomb: p.bomb, fc: p.fc || '', skin: p.skin || null, bot: p.bot || undefined });
+        players.push({ id: p.id, idx: i, name: p.name, team: p.team, gun: p.gun, gun2: p.gun2 || '', gm: p.gm || '', gm2: p.gm2 || '', bomb: p.bomb, fc: p.fc || '', skin: p.skin || null, bot: p.bot || undefined });
         spawns.push(slot[p.team]++);
       }
       const msg = {
@@ -728,7 +755,7 @@
       const list = m.players || [];
       for (let i = 0; i < list.length; i++) {
         const pd = list[i];
-        const base = { idx: i, id: pd.id, name: pd.name, team: pd.team, gun: pd.gun, gun2: pd.bot ? '' : pd.gun2, bomb: pd.bomb, fc: pd.fc, skin: pd.skin };
+        const base = { idx: i, id: pd.id, name: pd.name, team: pd.team, gun: pd.gun, gun2: pd.bot ? '' : pd.gun2, gm: pd.bot ? '' : pd.gm, gm2: pd.bot ? '' : pd.gm2, bomb: pd.bomb, fc: pd.fc, skin: pd.skin, bot: pd.bot || undefined };
         /* 塔のぼり: パワーアップ入りのぶき・HP（みんな同じ チップ・てきの つよさ から この端末で作る） */
         const td = m.tower && this._towerDefs ? this._towerDefs(pd) : null;
         if (td) Object.assign(base, td.base);
@@ -881,7 +908,7 @@
       const allyLv = level === 'flee' ? 'normal' : level;
       const players = [], spawns = [], slot = [0, 0];
       const add = (pd) => { players.push(pd); spawns.push(slot[pd.team]++); };
-      add({ id: 'host', name: clipName(CS.Settings.name), team: 0, gun: this._myGunId(), gun2: this._myGun2Id(), bomb: this._myBombId(), skin: this._mySkin() });
+      add({ id: 'host', name: clipName(CS.Settings.name), team: 0, gun: this._myGunId(), gun2: this._myGun2Id(), gm: this._myGm(), gm2: this._myGm2(), bomb: this._myBombId(), skin: this._mySkin() });
       let k = 0;
       for (let t = 0; t < 2; t++) {
         const n = t === 0 ? per - 1 : per;
@@ -958,6 +985,7 @@
 
     _clearEntities() {
       this.projectiles.length = 0;
+      this.fields.length = 0;
       this.bombs.length = 0;
       this.smokes.length = 0;
       this._dmgNums.length = 0;
@@ -1014,8 +1042,9 @@
       this._loadWorld(CS.Maps.practice);
       this.rng = CS.rng(12345);
       const gun = opt.gun ? CS.Weapons.gun(opt.gun).id : this._myGunId(), bomb = opt.bomb ? CS.Weapons.bomb(opt.bomb).id : this._myBombId();
-      const gun2 = opt.gun ? (opt.gun2 || '') : this._myGun2Id();     // チュートリアルは 銃 1つ
-      const p = makePlayer({ idx: 0, id: 'host', name: clipName(CS.Settings.name), team: 0, gun: gun, gun2: gun2, bomb: bomb, skin: this._mySkin() });
+      const gun2 = opt.gun ? (opt.gun2 || '') : this._myGun2Id();     // チュートリアルは えらんだ銃
+      const gm = opt.gun ? (opt.gm || '') : this._myGm(), gm2 = opt.gun ? (opt.gm2 || '') : this._myGm2();
+      const p = makePlayer({ idx: 0, id: 'host', name: clipName(CS.Settings.name), team: 0, gun: gun, gun2: gun2, gm: gm, gm2: gm2, bomb: bomb, skin: this._mySkin() });
       p.local = true; p.rpos = p.pos; p.rquat = p.quat;
       this._setRule(null);
       this.players = [p];
@@ -1117,7 +1146,10 @@
 
       const g = me.gun;
       const alive = me.alive && this.phase !== 'over';
-      const base = PLAYER.speed * (g.move || 1);       // 走る速さ
+      /* CS2: スロー（おそい）・スピードガン（はやい） */
+      const fx = me.fx, ft = this.time;
+      const fxMul = fx ? (fx.slow > ft ? fx.slowMul || 0.6 : 1) * (fx.spd > ft ? fx.spdMul || 1.35 : 1) : 1;
+      const base = PLAYER.speed * (g.move || 1) * fxMul;       // 走る速さ
       /* v5: 必殺技 せんしゃ（ジャンプ・スライディング なし）・バブル（うかぶ。ジャンプで 上・スライドで 下） */
       const tank = me.spK === 'tank' && alive, bubble = me.spK === 'bubble' && alive;
       /* v5.1: こおりボムで こおっている あいだは うごけない（向きを かえる・撃つ ことは できる） */
@@ -1408,8 +1440,13 @@
 
     /* 被弾の箱（立方体の中心 x,z はそのまま）。スライディング中は足もとを残して低くなる。
        結果 {cy: 箱の中心の高さ, hh: 高さの半分} は使い回し */
+    /* CS2: よこの 大きさの 半分（ボスは 大きい） */
+    _hx(q) { return q.big > 0 ? q.big : PLAYER.half; }
+
     _hurt(q) {
       const hb = this._hb, full = PLAYER.half;
+      /* CS2: ボスレイドの ボス（大きな 箱。中心は rpos） */
+      if (q.big > 0) { hb.cy = q.rpos[1]; hb.hh = q.bigH > 0 ? q.bigH : q.big; return hb; }
       const k = q.slideK > 0 ? (q.slideK < 1 ? q.slideK : 1) : 0;
       const hh = full + (SLIDE.hurtHeight * 0.5 - full) * k;
       hb.cy = q.rpos[1] - full + hh;
@@ -1690,9 +1727,9 @@
         for (let k = 0; k < this.players.length; k++) {
           const q = this.players[k];
           if (k === this.me || !q.alive || !q.connected || q.team === me.team) continue;
-          const hb = this._hurt(q);
+          const hb = this._hurt(q), hx = this._hx(q);
           const t = rayBox3(eye[0], eye[1], eye[2], dir[0], dir[1], dir[2], q.rpos[0], hb.cy, q.rpos[2],
-            PLAYER.half + 0.02, hb.hh + 0.02, PLAYER.half + 0.02, wallT);
+            hx + 0.02, hb.hh + 0.02, hx + 0.02, wallT);
           if (t < 0) continue;
           const hy = eye[1] + dir[1] * t;
           const head = hy > hb.cy + hb.hh * (PLAYER.headZone / PLAYER.half);
@@ -1729,7 +1766,7 @@
       if (g.type !== 'beam') {
         this._sendOwner({ t: 'sh', i: this.me, w: g.id, o: [r2(mx), r2(my), r2(mz)], e: ends }, true);
       }
-      this._claimHits(acc, g.id, 0);
+      this._claimHits(acc, g.id, 0, null, this.me, this._slotOf(this.me, g));
       if (anyHit) this._hitFeedback(anyHead);
     }
 
@@ -1742,7 +1779,7 @@
 
     /* at = ばくはつの場所（ボム用）。ホストはここからの距離で当たりを見る。
        owner = 撃った人（省略時は いま操作している人。自分の弾やボムが あとで当たったときは その持ち主） */
-    _claimHits(acc, wName, burn, at, owner) {
+    _claimHits(acc, wName, burn, at, owner, slot, field) {
       const hits = [];
       for (const k in acc) {
         const e = acc[k];
@@ -1753,6 +1790,8 @@
       if (!hits.length) return;
       const m = { t: 'hit', i: owner === undefined ? this.me : owner, hits: hits, w: wName, burn: burn ? 1 : 0 };
       if (at) m.p = [r2(at[0]), r2(at[1]), r2(at[2])];
+      if (slot >= 0) m.s = slot;                 // CS2: 何番目の 銃か（おなじ銃 2つで 部品が ちがう とき）
+      if (field) m.f = 1;                         // CS2: ブラックホールの ダメージ（れんしゃチェックを かるく）
       this._toHost(m);
     }
 
@@ -1777,8 +1816,8 @@
         c[0] = q.rpos[0]; c[1] = hb.cy; c[2] = q.rpos[2];
         const dx = c[0] - this.eye[0], dy = c[1] - this.eye[1], dz = c[2] - this.eye[2];
         const d = Math.hypot(dx, dy, dz);
-        if (d > f.range + PLAYER.half || d < 1e-4) continue;
-        if ((dx * this.aim[0] + dy * this.aim[1] + dz * this.aim[2]) / d < cone) continue;
+        if (d > f.range + this._hx(q) || d < 1e-4) continue;
+        if ((dx * this.aim[0] + dy * this.aim[1] + dz * this.aim[2]) / d < cone && !(q.big > 0 && d < f.range)) continue;
         if (!this.world.lineClear(this.eye, c)) continue;
         acc[q.idx] = { d: g.dmg, h: 0 };
         any = true;
@@ -1794,7 +1833,7 @@
         this._damageTarget(tg, g.dmg, false);
         any = true;
       }
-      if (any) { this._claimHits(acc, g.id, 1); if (!this._bot) CS.UI.hud.hit(false, false); }
+      if (any) { this._claimHits(acc, g.id, 1, null, this.me, this._slotOf(this.me, g)); if (!this._bot) CS.UI.hud.hit(false, false); }
     }
 
     _flameFx(g, dt) {
@@ -1994,6 +2033,15 @@
           this._addPart(p.rpos[0] + (rnd() - 0.5) * 0.9, p.rpos[1] + 0.2 + rnd() * 0.5, p.rpos[2] + (rnd() - 0.5) * 0.9,
             0, -0.6, 0, 0.08 + rnd() * 0.05, 0.72, 0.42, 1.0, 0.6, 0, 1.2, 0);
         }
+        /* CS2: スロー・ガード・パワー・スピード の 光 */
+        if (p.fx && p.alive && i !== this.me && rnd() < dt * 10) {
+          const f = p.fx, t = this.time;
+          const k = f.guard > t ? 'guard' : f.pow > t ? 'pow' : f.spd > t ? 'spd' : f.slow > t ? 'slow' : '';
+          if (k) {
+            const C = { guard: [0.45, 0.8, 1], pow: [1, 0.45, 0.35], spd: [1, 0.95, 0.35], slow: [0.75, 0.9, 1] }[k];
+            this._addPart(p.rpos[0] + (rnd() - 0.5) * 0.9, p.rpos[1] - 0.3 + rnd() * 0.6, p.rpos[2] + (rnd() - 0.5) * 0.9, 0, 0.9, 0, 0.08 + rnd() * 0.05, C[0], C[1], C[2], 0.6, 0, 1.2, 0);
+          }
+        }
         if (!p.spK) continue;
         if (this.time >= p.spEnd || !p.connected) { this._endSpecial(p); continue; }
         if (!p.alive || i === this.me || rnd() > dt * 22) continue;
@@ -2023,8 +2071,11 @@
       const me = this.players[this.me];
       const sd = this._spreadDeg(g);
       const muz = this._ownMuzzle(g);
-      const id = this.me * 100000 + (this.projSeq++);
-      const sp = g.proj.speed;
+      const pr = g.proj;
+      const n = Math.max(1, g.pellets | 0);
+      const id = this.me * 100000 + (this.projSeq % 99000);
+      this.projSeq += n;
+      const sp = pr.speed;
       /* 銃口（ビューモデル）は目より 1m ほど前・下にあるので、足もとを撃つと床の中に入る。
          床の中から出た弾は その場でばくはつして だれにも当たらない（ロケットジャンプもノーダメージ）。
          → 目から銃口までに壁・床があれば、その手前から出す（見た目の銃口はそのまま） */
@@ -2033,14 +2084,37 @@
       if (this._bot) {
         muz[0] = this.eye[0] + this.aim[0] * 0.55; muz[1] = this.eye[1] + this.aim[1] * 0.55; muz[2] = this.eye[2] + this.aim[2] * 0.55;
       }
-      const o = this._safeSpawn(muz, g.proj.size || 0.1);
-      const dir = sd > 0 ? V.spread(this.aim, sd, rnd) : this.aim;
-      const v = [dir[0] * sp + me.vel[0] * 0.2, dir[1] * sp + me.vel[1] * 0.2, dir[2] * sp + me.vel[2] * 0.2];
-      this._addProj(this.me, id, g, o, v);
-      this._sendOwner({
-        t: 'pj', i: this.me, id: id, g: g.id,
-        o: [r2(o[0]), r2(o[1]), r2(o[2])], v: [r2(v[0]), r2(v[1]), r2(v[2])], ts: Math.round(CS.now())
-      });
+      const o = this._safeSpawn(muz, pr.size || 0.1);
+      /* CS2: まっすぐ とぶ弾は「目から見た ねらいの点」へ 銃口から むける（照準の まんなかに 当たる） */
+      const conv = !this._bot && !(pr.grav > 0) && !(pr.homing > 0);
+      const slot = me.guns ? me.guns.indexOf(g) : -1;
+      const vs = [];
+      let v0 = null;
+      for (let k = 0; k < n; k++) {
+        let dir = sd > 0 ? V.spread(this.aim, sd, rnd) : this.aim;
+        if (conv) {
+          const range = g.range || 100;
+          const rc = this.world.raycast(this.eye, dir, range, this._rc);
+          let t = rc ? rc.t : range;
+          const hit = this._segPlayer(this.eye, dir[0], dir[1], dir[2], t, this.me, true);
+          if (hit) t = hit.t;
+          if (t > 1.2) {
+            const tx = this.eye[0] + dir[0] * t - o[0], ty = this.eye[1] + dir[1] * t - o[1], tz = this.eye[2] + dir[2] * t - o[2];
+            const tl = Math.hypot(tx, ty, tz) || 1;
+            dir = [tx / tl, ty / tl, tz / tl];
+          }
+        }
+        const v = [dir[0] * sp + me.vel[0] * 0.2, dir[1] * sp + me.vel[1] * 0.2, dir[2] * sp + me.vel[2] * 0.2];
+        this._addProj(this.me, id + k, g, o, v);
+        const rv = [r2(v[0]), r2(v[1]), r2(v[2])];
+        if (k === 0) v0 = rv; else vs.push(rv);
+      }
+      const m = { t: 'pj', i: this.me, id: id, g: g.id, o: [r2(o[0]), r2(o[1]), r2(o[2])], v: v0, ts: Math.round(CS.now()) };
+      if (vs.length) m.vs = vs;
+      if (slot >= 0) m.s = slot;
+      /* 速い弾は 見た目だけ（当たりは 撃った人が きめる）なので とどかなくても よい */
+      if (pr.fast) m.u = 1;
+      this._sendOwner(m, !!pr.fast);
     }
 
     /* 目 → 銃口 のあいだで、かべ・床に入らない最後の点（新しい配列） */
@@ -2079,12 +2153,15 @@
       const pr = g.proj;
       /* 他人の弾は上限つき（送りつけられても重くならない）。いちばん古い「他人の弾」から消す */
       if (owner !== this.me && this.projectiles.length >= MAX_FOREIGN_PROJ) this._dropOldestForeign(this.projectiles);
-      this.projectiles.push({
+      const p = {
         id: id, owner: owner, gun: g, pr: pr, mine: this._isAuth(owner),
         pos: [o[0], o[1], o[2]], vel: [v[0], v[1], v[2]], prev: [o[0], o[1], o[2]],
         age: 0, fuse: pr.fuse || 0, bounces: 0, dead: false, hidden: false, waitT: -1,
-        dist: 0, maxDist: (g.range || 120) + 12
-      });
+        dist: 0, maxDist: (g.range || 120) + 12,
+        hitSet: null, back: false, child: false            // CS2: つらぬいた人・ブーメランの もどり・はなびの 子
+      };
+      this.projectiles.push(p);
+      return p;
     }
 
     /* 的（ためし撃ち・塔のぼり）をこわせる持ち主か（ボットの弾・ボムは的に当たらない） */
@@ -2109,6 +2186,9 @@
       }
     }
 
+    /* CS2: 爆発・はなび・ブラックホール・回復の ない 速い弾（ほかの人の 画面では じぶんで 止める。px を 送らない） */
+    _plainFast(pr) { return !!(pr.fast && !(pr.radius > 0) && !pr.cluster && !pr.field && !(pr.healR > 0)); }
+
     _updateProjectiles(dt) {
       const list = this.projectiles;
       for (let i = list.length - 1; i >= 0; i--) {
@@ -2121,51 +2201,89 @@
           continue;
         }
         const pr = p.pr;
-        /* ホーミング */
+        /* ホーミング・ブーメラン */
         if (pr.homing > 0) this._homing(p, dt);
+        if (pr.boomer > 0 && this._boomer(p, dt)) { list.splice(i, 1); continue; }
         if (pr.grav) p.vel[1] -= pr.grav * dt;
+        /* 1回に すすむ きょり（まがる弾・はねる弾は こまかく。速い弾は 大きく） */
+        const maxStep = (pr.homing > 0 || pr.boomer > 0 || pr.bounce > 0) ? 0.35 : 3;
+        const enemyOnly = !(pr.heal > 0) && !pr.buff;
+        const owner = this.players[p.owner];
 
         let remain = dt;
         let guard = 0;
-        while (remain > 1e-5 && !p.dead && guard++ < 6) {
+        while (remain > 1e-5 && !p.dead && guard++ < 14) {
           const sp = Math.hypot(p.vel[0], p.vel[1], p.vel[2]);
           if (sp < 1e-4) break;
-          const step = Math.min(remain, Math.max(0.0005, 0.35 / sp));
+          const step = Math.min(remain, Math.max(0.0005, maxStep / sp));
           const dx = p.vel[0] * step, dy = p.vel[1] * step, dz = p.vel[2] * step;
           const len = Math.hypot(dx, dy, dz);
           const idx = 1 / (len || 1);
           p.prev[0] = p.pos[0]; p.prev[1] = p.pos[1]; p.prev[2] = p.pos[2];
           this._dir[0] = dx * idx; this._dir[1] = dy * idx; this._dir[2] = dz * idx;
+          const reach = len + pr.size * 0.5;
 
           /* 相手・的（オーナーだけが判定） */
           if (p.mine && pr.contact) {
-            const reach = len + pr.size * 0.5;
-            const hit = this._segPlayer(p.prev, dx * idx, dy * idx, dz * idx, reach, p.owner, true);
+            const hit = this._segPlayer(p.prev, dx * idx, dy * idx, dz * idx, reach, p.owner, enemyOnly, p.hitSet, pr.hitR);
             let tg = -1, tgT = 0;
             if (this.targets.length && this._canHitTargets(p.owner)) {
-              const r = this._rayTargets(p.prev, this._dir, hit ? hit.t : reach);
+              const r = this._rayTargets(p.prev, this._dir, hit ? hit.t : reach, p.tgSet);
               if (r.i >= 0) { tg = r.i; tgT = r.t; }
             }
             if (tg >= 0) {
               const hp = [p.prev[0] + dx * idx * tgT, p.prev[1] + dy * idx * tgT, p.prev[2] + dz * idx * tgT];
-              this._damageTarget(this.targets[tg], p.gun.dmg, false);
-              this._ownerDetonate(p, hp, null, true);
-              break;
+              this._damageTarget(this.targets[tg], p.gun.dmg * falloff(p.gun.falloff, p.dist + tgT), false);
+              if (pr.pierce) { (p.tgSet || (p.tgSet = {}))[tg] = 1; this._hitFeedback(false, p.owner); }
+              else { this._ownerDetonate(p, hp, null, true); break; }
+            } else if (hit) {
+              const hp = [p.prev[0] + dx * idx * hit.t, p.prev[1] + dy * idx * hit.t, p.prev[2] + dz * idx * hit.t];
+              const ally = owner && hit.p.team === owner.team;
+              if (ally) {
+                /* 回復・サポートの 弾が みかたに 当たった */
+                this._allyHit(p, hit.p, hp);
+                if (pr.pierce) (p.hitSet || (p.hitSet = {}))[hit.p.idx] = 1;
+                else { this._ownerDetonate(p, hp, null, false, true); break; }
+              } else if (pr.pierce) {
+                /* つらぬく弾: 当てて そのまま すすむ（1人に 1回） */
+                (p.hitSet || (p.hitSet = {}))[hit.p.idx] = 1;
+                const acc = {};
+                this._addDirect(acc, p, hit, hp);
+                this._claimHits(acc, p.gun.id, 0, null, p.owner, this._slotOf(p.owner, p.gun));
+                this._hitFeedback(hit.head, p.owner);
+              } else {
+                this._ownerDetonate(p, hp, hit);
+                break;
+              }
             }
+          } else if (!p.mine && pr.contact && pr.fast) {
+            /* ほかの人の 速い弾: 見た目だけ 人で 止める（当たりは 撃った人が きめる） */
+            const hit = this._segPlayer(p.prev, dx * idx, dy * idx, dz * idx, reach, p.owner, enemyOnly, p.hitSet, pr.hitR);
             if (hit) {
               const hp = [p.prev[0] + dx * idx * hit.t, p.prev[1] + dy * idx * hit.t, p.prev[2] + dz * idx * hit.t];
-              this._ownerDetonate(p, hp, hit);
-              break;
+              if (pr.pierce) { (p.hitSet || (p.hitSet = {}))[hit.p.idx] = 1; this._hitFx(hp, hit.p.team); }
+              else if (this._plainFast(pr)) { this._hitFx(hp, hit.p.team); p.dead = true; break; }
+              else { p.pos[0] = hp[0]; p.pos[1] = hp[1]; p.pos[2] = hp[2]; this._foreignStop(p); break; }
             }
           }
 
-          const rc = this.world.raycast(p.prev, this._dir, len + pr.size * 0.5, this._rc);
+          /* ブーメランの もどりは かべを すりぬける */
+          const rc = p.back ? null : this.world.raycast(p.prev, this._dir, len + pr.size * 0.5, this._rc);
           if (rc) {
             const t = Math.max(0, rc.t - pr.size * 0.5);
             p.pos[0] = p.prev[0] + dx * idx * t;
             p.pos[1] = p.prev[1] + dy * idx * t;
             p.pos[2] = p.prev[2] + dz * idx * t;
             p.dist += t;
+            /* ブーメラン: かべに 当たったら もどってくる */
+            if (pr.boomer > 0) {
+              const n = rc.n, d = p.vel[0] * n[0] + p.vel[1] * n[1] + p.vel[2] * n[2];
+              p.vel[0] -= 2 * d * n[0]; p.vel[1] -= 2 * d * n[1]; p.vel[2] -= 2 * d * n[2];
+              p.back = true; p.hitSet = null;
+              this._sparks(p.pos[0], p.pos[1], p.pos[2], n, p.gun.tracer, 3);
+              remain -= Math.max(step * (len > 1e-9 ? t / len : 1), step * 0.15);
+              continue;
+            }
             if (p.bounces < (pr.bounce || 0)) {
               p.bounces++;
               const n = rc.n;
@@ -2174,7 +2292,7 @@
               const dp = pr.bounceDamp > 0 ? pr.bounceDamp : 1;
               p.vel[0] *= dp; p.vel[1] *= dp; p.vel[2] *= dp;
               p.pos[0] += n[0] * 0.02; p.pos[1] += n[1] * 0.02; p.pos[2] += n[2] * 0.02;
-              this._sfx(p.gun.id === 'ricochet' ? 'ricochet' : 'bounce', p.pos, 0.7);
+              this._sfx(p.gun.id === 'ricochet' ? 'ricochet' : 'bounce', p.pos, pr.fast ? 0.35 : 0.7);
               this._sparks(p.pos[0], p.pos[1], p.pos[2], n, p.gun.tracer, 3);
               /* 進んだぶんだけ時間を消費（必ず少しは進める） */
               remain -= Math.max(step * (len > 1e-9 ? t / len : 1), step * 0.15);
@@ -2193,6 +2311,7 @@
               }
             }
             if (p.mine) this._ownerDetonate(p, p.pos, null);
+            else if (this._plainFast(pr)) { this._sparks(p.pos[0], p.pos[1], p.pos[2], rc.n, p.gun.tracer, 3); p.dead = true; }
             else this._foreignStop(p);
             break;
           }
@@ -2205,21 +2324,39 @@
           p.fuse -= dt;
           if (p.fuse <= 0) {
             if (p.mine) this._ownerDetonate(p, p.pos, null);
+            else if (this._plainFast(pr)) p.dead = true;
             else this._foreignStop(p);
             if (p.dead) { list.splice(i, 1); continue; }
           }
         }
-        if (p.dist > p.maxDist || p.age > 8) {
+        if ((p.dist > p.maxDist && !(pr.boomer > 0)) || p.age > 8) {
           if (p.mine) this._ownerDetonate(p, p.pos, null);
           else { this._projBoom(p, p.pos, true); p.dead = true; }
           if (p.dead) { list.splice(i, 1); continue; }
         }
-        /* しっぽ */
-        if (!p.hidden && (p.gun.id === 'rocket' || p.gun.id === 'grenade' || p.gun.id === 'plasma')) {
+        /* しっぽ（ロケット・グレネード・プラズマ・大きな ふしぎな 弾） */
+        if (!p.hidden && !pr.fast && (p.gun.id === 'rocket' || p.gun.id === 'grenade' || p.gun.id === 'plasma' || pr.size >= 0.15 || pr.radius > 0)) {
           this._addPart(p.pos[0], p.pos[1], p.pos[2], (rnd() - 0.5) * 0.6, (rnd() - 0.5) * 0.6 + 0.3, (rnd() - 0.5) * 0.6,
             0.12 + rnd() * 0.08, p.gun.tracer[0], p.gun.tracer[1], p.gun.tracer[2], 0.22, -0.4, 2.2, 0);
         }
       }
+    }
+
+    /* CS2: ブーメラン: もどる時間に なったら 持ち主へ。持ち主に とどいたら きえる（true） */
+    _boomer(p, dt) {
+      const pr = p.pr;
+      if (!p.back && p.age >= pr.boomer) { p.back = true; p.hitSet = null; }
+      if (!p.back) return false;
+      const o = this.players[p.owner];
+      if (!o || !o.alive) { p.dead = true; return true; }
+      const tp = o.local ? o.pos : o.rpos;
+      const tx = tp[0] - p.pos[0], ty = tp[1] + 0.1 - p.pos[1], tz = tp[2] - p.pos[2];
+      const d = Math.hypot(tx, ty, tz);
+      if (d < 1.0) { p.dead = true; return true; }
+      const sp = Math.max(pr.speed * 1.15, Math.hypot(p.vel[0], p.vel[1], p.vel[2]));
+      const k = Math.min(1, dt * 7);
+      p.vel[0] += (tx / d * sp - p.vel[0]) * k; p.vel[1] += (ty / d * sp - p.vel[1]) * k; p.vel[2] += (tz / d * sp - p.vel[2]) * k;
+      return false;
     }
 
     /* かべに 入った点 at から dir へ すすんで、かべの外に 出た点（新しい配列）。maxLen より あつい・地面の下 なら null */
@@ -2275,18 +2412,20 @@
       p.vel[0] = nx / nl * sp; p.vel[1] = ny / nl * sp; p.vel[2] = nz / nl * sp;
     }
 
-    /* 線分と相手の当たり判定 */
-    _segPlayer(o, dx, dy, dz, len, ownerIdx, enemyOnly) {
+    /* 線分と相手の当たり判定。skip = 当たらない人（{idx:1}）・extra = 当たりを 大きく（m） */
+    _segPlayer(o, dx, dy, dz, len, ownerIdx, enemyOnly, skip, extra) {
       const owner = this.players[ownerIdx];
+      const ex = 0.05 + (extra > 0 ? extra : 0);
       let best = null, bestT = len;
       for (let k = 0; k < this.players.length; k++) {
         const q = this.players[k];
         if (!q.alive || !q.connected) continue;
         if (k === ownerIdx) continue;
         if (enemyOnly && owner && q.team === owner.team) continue;
-        const hb = this._hurt(q);
+        if (skip && skip[k]) continue;
+        const hb = this._hurt(q), hx = this._hx(q);
         const t = rayBox3(o[0], o[1], o[2], dx, dy, dz, q.rpos[0], hb.cy, q.rpos[2],
-          PLAYER.half + 0.05, hb.hh + 0.05, PLAYER.half + 0.05, bestT);
+          hx + ex, hb.hh + ex, hx + ex, bestT);
         if (t < 0) continue;
         bestT = t;
         best = { p: q, t: t, head: (o[1] + dy * t) > hb.cy + hb.hh * (PLAYER.headZone / PLAYER.half) };
@@ -2294,11 +2433,11 @@
       return best;
     }
 
-    _rayTargets(o, d, maxT) {
+    _rayTargets(o, d, maxT, skip) {
       let bi = -1, bt = maxT;
       for (let i = 0; i < this.targets.length; i++) {
         const tg = this.targets[i];
-        if (tg.dead) continue;
+        if (tg.dead || (skip && skip[i])) continue;
         const t = rayBox(o[0], o[1], o[2], d[0], d[1], d[2], tg.pos[0], tg.pos[1], tg.pos[2], tg.half || 0.45, bt);
         if (t < 0) continue;
         bt = t; bi = i;
@@ -2306,27 +2445,111 @@
       return { i: bi, t: bt };
     }
 
-    /* オーナーが弾を爆発/消滅させる */
-    _ownerDetonate(p, at, hit, hitTarget) {
+    /* CS2: 持ち主の 何番目の 銃か（ない なら -1） */
+    _slotOf(ownerIdx, g) {
+      const o = this.players[ownerIdx];
+      return o && o.guns ? o.guns.indexOf(g) : -1;
+    }
+
+    /* CS2: 弾が てきに じかに 当たった ダメージ（きょりで へる）・ふきとばし・いなずま を acc に */
+    _addDirect(acc, p, hit, pos) {
+      const g = p.gun, pr = p.pr, q = hit.p;
+      const e = acc[q.idx] || (acc[q.idx] = { d: 0, h: 0 });
+      e.d += g.dmg * falloff(g.falloff, p.dist + (hit.t || 0)) * (hit.head ? (g.hs || 1) : 1);
+      if (hit.head) e.h = 1;
+      if (pr.knock > 0 || pr.knockUp > 0) {
+        const sp = Math.hypot(p.vel[0], p.vel[2]) || 1;
+        const kn = pr.knock || 0;
+        e.kx = (e.kx || 0) + p.vel[0] / sp * kn;
+        e.ky = (e.ky || 0) + (pr.knockUp || 0) + (kn > 0 ? 2 : 0);
+        e.kz = (e.kz || 0) + p.vel[2] / sp * kn;
+      }
+      if (pr.chain) this._chain(acc, p, q, pos);
+    }
+
+    /* CS2: いなずま: 当たった人から ちかくの てきへ とびうつる（見た目は みんなへ 'sh'） */
+    _chain(acc, p, first, pos) {
+      const c = p.pr.chain, g = p.gun, owner = this.players[p.owner];
+      const done = {}; done[first.idx] = 1;
+      let from = [pos[0], pos[1], pos[2]];
+      const ends = [], tp = [0, 0, 0];
+      for (let k = 0; k < (c.n | 0); k++) {
+        let best = null, bd = c.r || 6;
+        for (const q of this.players) {
+          if (!q.alive || !q.connected || done[q.idx] || q.idx === p.owner || (owner && q.team === owner.team) || !inPlay(q)) continue;
+          const hb = this._hurt(q);
+          tp[0] = q.rpos[0]; tp[1] = hb.cy; tp[2] = q.rpos[2];
+          const d = V.dist(from, tp);
+          if (d < bd && this.world.lineClear(from, tp)) { bd = d; best = q; }
+        }
+        if (!best) break;
+        done[best.idx] = 1;
+        const to = [best.rpos[0], this._hurt(best).cy, best.rpos[2]];
+        const e = acc[best.idx] || (acc[best.idx] = { d: 0, h: 0 });
+        e.d += g.dmg * (c.k || 0.5);
+        this._tracer(from[0], from[1], from[2], to[0], to[1], to[2], g.tracer, 0.07, 0.22);
+        this._hitFx(to, best.team);
+        ends.push([r2(to[0]), r2(to[1]), r2(to[2]), 1]);
+        from = to;
+      }
+      if (ends.length) this._sendOwner({ t: 'sh', i: p.owner, w: g.id, o: [r2(pos[0]), r2(pos[1]), r2(pos[2])], e: ends, z: 1 }, true);
+    }
+
+    /* CS2: 回復・サポートの 弾が みかたに 当たった（ホストへ） */
+    _allyHit(p, q, at) {
+      const pr = p.pr;
+      const h = [[q.idx, pr.heal > 0 ? r2(pr.heal) : 0]];
+      this._toHost({ t: 'hl', i: p.owner, w: p.gun.id, s: this._slotOf(p.owner, p.gun), h: h });
+      this._healFx(at, pr.buff ? pr.buff.k : 'heal');
+      if (!this._bot && p.owner === this.me) this._sfx('ok', null, 0.35);
+    }
+    /* CS2: ばくはつの はんいの みかたを 回復（じぶんも すこし） */
+    _healSplash(p, pos) {
+      const pr = p.pr, owner = this.players[p.owner];
+      if (!owner) return;
+      const h = [], c = this._hc;
+      for (const q of this.players) {
+        if (!q.alive || !q.connected || q.team !== owner.team || !inPlay(q)) continue;
+        const hb = this._hurt(q);
+        c[0] = q.rpos[0]; c[1] = hb.cy; c[2] = q.rpos[2];
+        if (V.dist(c, pos) > pr.healR + PLAYER.half) continue;
+        if (!this.world.lineClear(this._unbury(pos), c)) continue;
+        h.push([q.idx, r2(q.idx === p.owner ? pr.heal * 0.5 : pr.heal)]);
+        if (h.length >= 8) break;
+      }
+      if (h.length) this._toHost({ t: 'hl', i: p.owner, w: p.gun.id, s: this._slotOf(p.owner, p.gun), h: h });
+      this._healFx(pos, 'heal', pr.healR);
+    }
+    /* 回復・サポートの 光（kind: heal / guard / pow / spd） */
+    _healFx(pos, kind, r) {
+      const C = { heal: [0.4, 1, 0.6], guard: [0.45, 0.8, 1], pow: [1, 0.45, 0.35], spd: [1, 0.95, 0.35], slow: [0.7, 0.9, 1] };
+      const c = C[kind] || C.heal, n = r ? 22 : 10, rr = r || 0.6;
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2;
+        this._addPart(pos[0] + Math.cos(a) * rr * 0.5, pos[1], pos[2] + Math.sin(a) * rr * 0.5, Math.cos(a) * 1.5, 1.5 + rnd() * 1.5, Math.sin(a) * 1.5,
+          0.1 + rnd() * 0.06, c[0], c[1], c[2], 0.6, 0, 1.6, 0);
+      }
+    }
+
+    /* オーナーが弾を爆発/消滅させる（noDmg = みかたに 当たって 止まった 回復の 弾） */
+    _ownerDetonate(p, at, hit, hitTarget, noDmg) {
       if (p.dead) return;
       p.dead = true;
       const pos = [at[0], at[1], at[2]];
       const pr = p.pr, g = p.gun;
       const acc = {};
-      if (hit && hit.p) {
-        const e = acc[hit.p.idx] || (acc[hit.p.idx] = { d: 0, h: 0 });
-        e.d += g.dmg * (hit.head ? (g.hs || 1) : 1);
-        if (hit.head) e.h = 1;
-      }
-      if (pr.radius > 0) {
+      if (hit && hit.p && !noDmg) this._addDirect(acc, p, hit, pos);
+      if (pr.radius > 0 && pr.splashDmg > 0) {
         this._splash(acc, pos, pr.radius, pr.splashDmg, pr.splashMin, projKnock(pr), pr.selfMult || 0, p.owner);
       }
-      if (hit && hit.p) this._hitFeedback(hit.head, p.owner);
+      if (pr.healR > 0) this._healSplash(p, pos);
+      if (hit && hit.p && !noDmg) this._hitFeedback(hit.head, p.owner);
       if (hitTarget) this._hitFeedback(false, p.owner);
       /* 的（ばくはつ） */
-      if (pr.radius > 0 && this.targets.length && this._canHitTargets(p.owner)) this._targetsAt(pos, pr.radius, pr.splashDmg, pr.splashMin);
-      this._claimHits(acc, g.id, 0, null, p.owner);
-      this._sendOwner({ t: 'px', i: p.owner, id: p.id, p: [r2(pos[0]), r2(pos[1]), r2(pos[2])] });
+      if (pr.radius > 0 && pr.splashDmg > 0 && this.targets.length && this._canHitTargets(p.owner)) this._targetsAt(pos, pr.radius, pr.splashDmg, pr.splashMin);
+      this._claimHits(acc, g.id, 0, null, p.owner, this._slotOf(p.owner, g));
+      /* ふつうの 速い弾は ほかの人の 画面でも じぶんで 止まるので 知らせない */
+      if (!this._plainFast(pr)) this._sendOwner({ t: 'px', i: p.owner, id: p.id, p: [r2(pos[0]), r2(pos[1]), r2(pos[2])] });
       this._projBoom(p, pos, false);
     }
 
@@ -2343,13 +2566,98 @@
         this._boom(pos, pr.radius, g.tracer, pr.radius >= 2);
         if (!silent) this._sfx(pr.radius >= 2 ? 'explode' : 'explode_small', pos);
         this._shakeAt(pos, pr.radius);
+      } else if (pr.fast) {
+        this._sparks(pos[0], pos[1], pos[2], null, g.tracer, 3);
       } else {
         this._sparks(pos[0], pos[1], pos[2], null, g.tracer, 5);
         if (!silent) this._sfx('hit', pos, 0.5);
       }
       /* 自分の爆風で自分を飛ばす（自分のクライアントが動きの権利を持つ。ボットの弾ならそのボット） */
       if (p.mine && pr.radius > 0) this._selfKnock(pos, pr.radius, projKnock(pr), p.owner);
+      /* CS2: はなび: 子の弾が とびちる（みんな おなじ 種から おなじ ように） */
+      if (pr.cluster && !p.child) this._clusterOut(p, pos);
+      /* CS2: ブラックホール */
+      if (pr.field && !p.child) this._fieldAt(p, pos);
     }
+
+    /* CS2: はなびの 子の弾 */
+    _clusterOut(p, pos) {
+      const c = p.pr.cluster, g = p.gun;
+      const cg = g._child || (g._child = Object.assign({}, g, {
+        dmg: c.dmg || 0, pellets: 1,
+        proj: CS.Weapons.P({ speed: c.speed || 8, grav: 12, size: 0.1, fuse: 0.7, radius: c.radius || 2, splashDmg: c.splash || 20, splashMin: 0.3, selfMult: p.pr.selfMult || 0 })
+      }));
+      const rg = CS.rng((Math.abs(p.id) * 2654435761) >>> 0);
+      const COLS = [[1, 0.4, 0.7], [1, 0.9, 0.3], [0.4, 0.9, 1], [0.6, 1, 0.5], [1, 0.6, 0.25], [0.8, 0.5, 1]];
+      for (let i = 0; i < (c.n | 0) && i < 12; i++) {
+        const a = rg() * Math.PI * 2, e = 0.35 + rg() * 0.55, sp = (c.speed || 8) * (0.6 + rg() * 0.6);
+        const v = [Math.cos(a) * sp * (1 - e * 0.5), sp * e + 2, Math.sin(a) * sp * (1 - e * 0.5)];
+        const ch = this._addProj(p.owner, -(Math.abs(p.id) * 8 + i + 1), cg, [pos[0], pos[1] + 0.25, pos[2]], v);
+        ch.child = true;
+        ch.fuse = 0.5 + rg() * 0.45;
+        const col = COLS[i % COLS.length];
+        for (let k = 0; k < 3; k++) this._addPart(pos[0], pos[1], pos[2], v[0] * 0.6 + (rnd() - 0.5), v[1] * 0.6, v[2] * 0.6 + (rnd() - 0.5), 0.1, col[0], col[1], col[2], 0.6, 4, 1.2, 0);
+      }
+    }
+
+    /* CS2: ブラックホール（すいこむのは その人を 動かしている 端末。ダメージは 撃った人の 端末） */
+    _fieldAt(p, pos) {
+      const f = p.pr.field;
+      const owner = this.players[p.owner];
+      if (this.fields.length >= 12) this.fields.shift();
+      this.fields.push({
+        pos: [pos[0], pos[1], pos[2]], r: f.r || 5, until: this.time + (f.dur || 3), dur: f.dur || 3, t0: this.time,
+        pull: f.pull || 12, dps: f.dps || 15, tick: 0.2, owner: p.owner, team: owner ? owner.team : -1, gun: p.gun, mine: p.mine
+      });
+      this._sfx('portal', pos, 0.9);
+    }
+
+    _updateFields(dt) {
+      const F = this.fields;
+      for (let i = F.length - 1; i >= 0; i--) {
+        const f = F[i];
+        if (this.time >= f.until) { F.splice(i, 1); continue; }
+        const k0 = Math.min(1, (this.time - f.t0) * 3);
+        /* すいこむ（じぶんと この端末が 動かす コンピューター） */
+        for (const q of this.players) {
+          if (!q.alive || !q.connected || q.team === f.team || q.raidBoss) continue;
+          if (!(q.local || (q.bot && this.hostBots))) continue;
+          const dx = f.pos[0] - q.pos[0], dy = f.pos[1] - q.pos[1], dz = f.pos[2] - q.pos[2];
+          const d = Math.hypot(dx, dy, dz);
+          if (d > f.r || d < 0.3) continue;
+          const k = f.pull * dt * k0 * (0.45 + 0.55 * (1 - d / f.r));
+          q.vel[0] += dx / d * k; q.vel[1] += dy / d * k * 0.7 + (q.grounded ? 0 : 0); q.vel[2] += dz / d * k;
+        }
+        /* ダメージ（撃った人の 端末が 0.33秒ごとに） */
+        if (f.mine && this.phase === 'live') {
+          f.tick -= dt;
+          if (f.tick <= 0) {
+            f.tick = 0.33;
+            const acc = {}, c = this._hc, dmg = f.dps * 0.33;
+            for (const q of this.players) {
+              if (!q.alive || !q.connected || q.team === f.team) continue;
+              const hb = this._hurt(q);
+              c[0] = q.rpos[0]; c[1] = hb.cy; c[2] = q.rpos[2];
+              const d = V.dist(c, f.pos);
+              if (d > f.r + this._hx(q)) continue;
+              const e = acc[q.idx] || (acc[q.idx] = { d: 0, h: 0 });
+              e.d += dmg * (0.5 + 0.5 * clamp(1 - d / f.r, 0, 1));
+            }
+            if (this.targets.length && this._canHitTargets(f.owner)) this._targetsAt(f.pos, f.r, dmg, 0.5);
+            this._claimHits(acc, f.gun.id, 0, f.pos, f.owner, this._slotOf(f.owner, f.gun), true);
+          }
+        }
+        /* 見た目: まわる つぶ */
+        if (rnd() < dt * 50) {
+          const a = rnd() * Math.PI * 2, rr = f.r * (0.6 + rnd() * 0.4), yy = (rnd() - 0.5) * f.r * 0.8;
+          const px = f.pos[0] + Math.cos(a) * rr, pz = f.pos[2] + Math.sin(a) * rr, py = f.pos[1] + yy;
+          const sp = 2.5;
+          this._addPart(px, py, pz, (f.pos[0] - px) * sp + Math.sin(a) * 3, (f.pos[1] - py) * sp, (f.pos[2] - pz) * sp - Math.cos(a) * 3,
+            0.09 + rnd() * 0.07, 0.62, 0.35, 1.0, 0.4, 0, 0, 0);
+        }
+      }
+    }
+
 
     _shakeAt(pos, radius) {
       if (this._bot) return;
@@ -2395,10 +2703,10 @@
         const hb = this._hurt(q);                     // スライディング中は低い所が中心
         c[0] = q.rpos[0]; c[1] = hb.cy; c[2] = q.rpos[2];
         const dx = c[0] - pos[0], dy = c[1] - pos[1], dz = c[2] - pos[2];
-        const d = Math.hypot(dx, dy, dz);
-        if (d > radius + PLAYER.half) continue;
-        if (!this.world.lineClear(pos, c)) continue;
-        const f = clamp(1 - Math.max(0, d - PLAYER.half) / radius, 0, 1);
+        const d = Math.hypot(dx, dy, dz), hx = this._hx(q);
+        if (d > radius + hx) continue;
+        if (!this.world.lineClear(pos, c) && !(q.big > 0)) continue;
+        const f = clamp(1 - Math.max(0, d - hx) / radius, 0, 1);
         const mult = minMult + (1 - minMult) * f;
         const isSelf = k === ownerIdx;
         const friendly = owner && !isSelf && q.team === owner.team;
@@ -2971,7 +3279,7 @@
         }
         /* 回復（塔のぼりのパワーアップで はやくなる） */
         const mh = p.maxHp || RULES.hp;
-        if (p.alive && p.hp < mh && t - p.lastDmgT > (p.regenDelay || RULES.regenDelay)) {
+        if (p.alive && !p.noRegen && p.hp < mh && t - p.lastDmgT > (p.regenDelay || RULES.regenDelay)) {
           p.hp = Math.min(mh, p.hp + (p.regenRate || RULES.regenRate) * dt);
         }
         /* トークン（連射チェック） */
@@ -3099,11 +3407,16 @@
       if (isBomb) {
         if (def.id !== a.bomb.id) return;
         def = a.bomb;                         // 持っている定義そのもの（塔のぼりはパワーアップ入り）
-      } else if (def.id === a.gun.id) def = a.gun;
+      }
+      /* CS2: 何番目の 銃か（おなじ銃 2つで 部品が ちがう とき） */
+      else if (a.guns && msg.s !== undefined && a.guns[msg.s | 0] && a.guns[msg.s | 0].id === def.id) def = a.guns[msg.s | 0];
+      else if (def.id === a.gun.id) def = a.gun;
       /* v5: 2つめの銃（もちかえ）・必殺技の まえに 持っていた銃 */
       else if (a.guns && a.guns[0] && def.id === a.guns[0].id) def = a.guns[0];
       else if (a.guns && a.guns[1] && def.id === a.guns[1].id) def = a.guns[1];
       else if (a.spBase && def.id === a.spBase.id) def = a.spBase;
+      /* CS2: ボスレイドの ボスの こうげき */
+      else if (a.raidBoss && def.raidBoss) def = def;
       /* v4: 必殺技の銃が おわった すぐあと（ゲストの時計は すこし おくれる）は まだ うけつける */
       else if (def.special && a.spGun && a.spGun.id === def.id && this.time < a.spGrace) def = a.spGun;
       else return;                            // 持ってない銃
@@ -3117,9 +3430,14 @@
         return;
       }
 
-      /* 連射チェック */
-      if (isBomb) { if (a.bombTokens < 1) return; a.bombTokens -= 1; }
-      else { if (a.tokens < 1) return; a.tokens -= 1; }
+      /* 連射チェック（CS2: 散弾は 1つぶずつ 来るので つぶの数で わる。ブラックホールの ダメージは かるく。ボスは しない） */
+      if (a.raidBoss) { /* ボス */ }
+      else if (isBomb) { if (a.bombTokens < 1) return; a.bombTokens -= 1; }
+      else {
+        const cost = msg.f ? 0.15 : 1 / Math.max(1, def.pellets | 0);
+        if (a.tokens < cost) return;
+        a.tokens -= cost;
+      }
 
       /* 撃った人のむてきを解除 */
       if (a.protect) { a.protect = false; a.protectUntil = 0; }
@@ -3167,18 +3485,90 @@
         /* v5: よわよわボムを あびた人の こうげきは よわい・クリスタルまもりの てきは ウェーブで つよく なる */
         if (!self && a.weakUntil > this.time) dmg *= a.weakMul || WEAK_MUL;
         if (!self && a.dmgMul > 0) dmg *= a.dmgMul;
+        /* CS2: パワーガンで つよく なっている */
+        if (!self && a.fx && a.fx.pow > this.time) dmg *= a.fx.powMul || 1.3;
         const d = V.dist(org, v.lastReport);
-        if (d > range) continue;
+        if (d > range + (v.big > 0 ? v.big : 0)) continue;
         const kb = (h[3] || h[4] || h[5]) ? [num(h[3]), num(h[4]), num(h[5])] : 0;
+        const hp0 = v.hp;
         this._hostApplyDamage(v, dmg, a, w, h[2] === 1, kb, a.lastReport);
+        /* CS2: 部品の こうか（吸血・スロー・炎上） */
+        if (!isBomb && !self && v.team !== a.team) {
+          const got = Math.max(0, hp0 - Math.max(0, v.hp));
+          if (def.lifesteal > 0 && a.alive && got > 0) a.hp = Math.min(a.maxHp || RULES.hp, a.hp + got * def.lifesteal);
+          const oh = def.onHit;
+          if (oh && v.alive && !v.raidBoss) {
+            if (oh.slow) this._hostFx(v, 'slow', oh.slow.dur, oh.slow.mul);
+            if (oh.burn) v.burn = { dps: oh.burn.dps, until: this.time + oh.burn.dur, by: idx, acc: v.burn ? v.burn.acc : 0 };
+          } else if (oh && oh.burn && v.alive) v.burn = { dps: oh.burn.dps, until: this.time + oh.burn.dur, by: idx, acc: v.burn ? v.burn.acc : 0 };
+        }
         /* v5: よわよわボム: 当たった相手を よわくする */
         if (isBomb && def.effect === 'weak' && def.weak && !self && v.team !== a.team && v.alive) this._hostWeak(v, def.weak);
         /* v5.1: こおりボム: 当たった相手は しばらく うごけない */
         if (isBomb && def.effect === 'freeze' && def.freeze && !self && v.team !== a.team && v.alive) this._hostFreeze(v, def.freeze);
-        if (msg.burn && a.gun.flame && a.gun.flame.burn && v.alive) {
-          v.burn = { dps: a.gun.flame.burn.dps, until: this.time + a.gun.flame.burn.dur, by: idx, acc: v.burn ? v.burn.acc : 0 };
+        if (msg.burn && def.flame && def.flame.burn && v.alive && !self && v.team !== a.team) {
+          v.burn = { dps: def.flame.burn.dps, until: this.time + def.flame.burn.dur, by: idx, acc: v.burn ? v.burn.acc : 0 };
         }
       }
+    }
+
+    /* CS2: 回復・サポートの 弾（ホストが たしかめて みんなへ）。msg.h = [[人, 回復量], ...] */
+    _hostHeal(msg, fromId) {
+      if (this.mode !== 'match' && this.mode !== 'practice') return;
+      if (this.phase !== 'live') return;
+      const idx = this._idxOf(fromId);
+      const a = this.players[idx];
+      if (!a || !a.connected || !a.alive || (msg.i | 0) !== idx) return;
+      const w = String(msg.w || '');
+      let def = null;
+      if (a.guns && msg.s !== undefined && a.guns[msg.s | 0] && a.guns[msg.s | 0].id === w) def = a.guns[msg.s | 0];
+      else if (a.gun && a.gun.id === w) def = a.gun;
+      else if (a.guns) for (const g of a.guns) if (g && g.id === w) def = g;
+      if (!def || !def.proj) return;
+      const pr = def.proj;
+      if (a.tokens < 0.3) return;
+      a.tokens -= 0.3;
+      const cap = (pr.heal > 0 ? pr.heal : 0) * 1.05 + 0.01;
+      const list = Array.isArray(msg.h) ? msg.h : [];
+      for (let i = 0; i < list.length && i < 8; i++) {
+        const h = list[i];
+        if (!Array.isArray(h)) continue;
+        const v = this.players[h[0] | 0];
+        if (!v || !v.alive || !v.connected || v.team !== a.team || v.raidBoss) continue;
+        const self = v === a;
+        if (self && !(pr.healR > 0)) continue;
+        if (V.dist(a.lastReport, v.lastReport) > (def.range || 60) + RANGE_SLACK + (pr.healR || 0)) continue;
+        let amt = clamp(num(h[1]), 0, cap);
+        if (self) amt = Math.min(amt, cap * 0.5);
+        const mh = v.maxHp || RULES.hp;
+        if (amt > 0 && v.hp < mh) {
+          v.hp = Math.min(mh, v.hp + amt);
+          this._broadcast({ t: 'dmg', v: v.idx, a: idx, hp: Math.round(v.hp), w: w, hs: 0, d: 0, heal: 1 });
+        }
+        if (pr.buff && !self) this._hostFx(v, pr.buff.k, pr.buff.dur, pr.buff.mul);
+      }
+    }
+
+    /* CS2: こうか（slow / guard / pow / spd）を みんなへ */
+    _hostFx(v, k, dur, mul) {
+      if (!v || !v.fx || ['slow', 'guard', 'pow', 'spd'].indexOf(k) < 0) return;
+      dur = clamp(num(dur) || 2, 0.2, 12); mul = clamp(num(mul) || 1, 0.2, 3);
+      v.fx[k] = this.time + dur; v.fx[k + 'Mul'] = mul;
+      this._broadcast({ t: 'fx', v: v.idx, k: k, d: r2(dur), m: r2(mul) });
+    }
+    _onFx(m) {
+      const p = this.players[m.v | 0];
+      const k = m.k;
+      if (!p || !p.fx || ['slow', 'guard', 'pow', 'spd'].indexOf(k) < 0) return;
+      if (this.mode !== 'match' && this.mode !== 'practice') return;
+      const dur = clamp(num(m.d), 0, 12);
+      const was = p.fx[k] > this.time;
+      p.fx[k] = this.time + dur; p.fx[k + 'Mul'] = clamp(num(m.m) || 1, 0.2, 3);
+      if (p.idx === this.me && !was) {
+        const T = { slow: ['足が おそく なった！', '#bfe8ff'], guard: ['ガード！ うける ダメージ ダウン', '#8fd0ff'], pow: ['パワーアップ！ こうげき力 アップ', '#ffb08f'], spd: ['スピードアップ！', '#ffe98f'] };
+        CS.UI.hud.center(T[k][0], T[k][1], 1000);
+      }
+      this._healFx(p.rpos, k);
     }
 
     /* v5: よわよわ（ホストが きめて みんなへ） */
@@ -3269,6 +3659,11 @@
       /* v5: せんしゃ: うける ダメージは 3分の1 */
       if (v.spK === 'tank') dmg *= TANK_ARMOR;
       if (v.armor > 0 && v.armor !== 1) dmg *= v.armor;          // 塔のぼり: かたい
+      /* CS2: ガードガン（うける ダメージ へる）・狂戦士の 部品（ふえる） */
+      if (a && a !== v) {
+        if (v.fx && v.fx.guard > this.time) dmg *= v.fx.guardMul || 0.6;
+        if (v.takeMul > 0 && v.takeMul !== 1) dmg *= v.takeMul;
+      }
       v.hp -= dmg;
       v.lastDmgT = this.time;
       const aIdx = a ? a.idx : -1;
@@ -3537,6 +3932,7 @@
       if (t === 'hello') { this._hostHello(msg, fromId); return; }
       if (t === 'set') { this._hostSet(fromId, msg); return; }
       if (t === 'hit') { this._hostHit(msg, fromId); return; }
+      if (t === 'hl') { this._hostHeal(msg, fromId); return; }        // CS2: 回復・サポート
       /* v4: 必殺技・クリスタル・塔のぼりの とびら */
       if (t === 'spc') { this._hostSpecial(msg, fromId); return; }
       if (t === 'tgh') { this._hostTargetHit(msg, fromId); return; }
@@ -3586,6 +3982,7 @@
         fc: cleanFc(msg.fc), skin: cleanSkin(msg.skin)
       };
       rec.gun2 = cleanGun2(msg.gun2, rec.gun);
+      rec.gm = cleanMods(msg.gm, rec.gun); rec.gm2 = rec.gun2 ? cleanMods(msg.gm2, rec.gun2) : '';
       rec.name = this._uniqueName(clipName(msg.name), rec);
       this.room.players.push(rec);
       this._broadcastLobby();
@@ -3622,6 +4019,8 @@
       if (!this.room.started && this.mode === 'lobby') {
         if (msg.gun !== undefined) { p.gun = CS.Weapons.gun(msg.gun).id; p.ready = false; changed = true; }
         if (msg.gun2 !== undefined) { p.gun2 = cleanGun2(msg.gun2, p.gun); changed = true; }
+        if (msg.gm !== undefined) { p.gm = cleanMods(msg.gm, p.gun); p.ready = false; changed = true; }
+        if (msg.gm2 !== undefined) { p.gm2 = p.gun2 ? cleanMods(msg.gm2, p.gun2) : ''; p.ready = false; changed = true; }
         if (msg.bomb !== undefined) { p.bomb = CS.Weapons.bomb(msg.bomb).id; p.ready = false; changed = true; }
         if (msg.team !== undefined && !isCoopMode(this.room.mode) && !this.room.ranked) {     // ランダムマッチは チームを かえない
           const t = (msg.team | 0) === 1 ? 1 : 0;
@@ -3640,7 +4039,7 @@
       const players = [];
       for (const p of this.room.players) {
         players.push({
-          id: p.id, name: p.name, team: p.team, gun: p.gun, gun2: p.gun2 || '', bomb: p.bomb, ready: !!p.ready, ping: p.ping | 0, bot: p.bot || undefined,
+          id: p.id, name: p.name, team: p.team, gun: p.gun, gun2: p.gun2 || '', gm: p.gm || '', gm2: p.gm2 || '', bomb: p.bomb, ready: !!p.ready, ping: p.ping | 0, bot: p.bot || undefined,
           fc: p.fc || '', skin: p.skin || null
         });
       }
@@ -3692,6 +4091,7 @@
         case 'spx': this._onSpecialCancel(msg); break;
         case 'gsw': this._onGunSwitch(msg); break;
         case 'king': this._onKing(msg); break;
+        case 'fx': this._onFx(msg); break;                             // CS2: スロー・ガード・パワー・スピード
         case 'dfw': if (this._onDefWave) this._onDefWave(msg); break;
         case 'tn': if (this._onTn) this._onTn(msg); break;             // v5.1: トーナメント表
       }
@@ -3791,10 +4191,11 @@
     _onShot(m) {
       const p = this.players[m.i | 0];
       if (!p || p.local) return;
-      const g = CS.GunMap[m.w] || p.gun;
-      p.flash = 1;
+      const g = this._gunOf(p, m.w) || p.gun;
       const o = m.o || [0, 0, 0];
-      this._sfx(g.sfx, o);
+      /* CS2: いなずま（z）は 当たった所から とびうつる */
+      if (m.z) this._sfx('shot_rail', o, 0.4);
+      else { p.flash = 1; this._sfx(g.sfx, o); }
       const ends = m.e || [];
       for (let i = 0; i < ends.length && i < 12; i++) {
         const e = ends[i];
@@ -3807,12 +4208,30 @@
     _onProjSpawn(m) {
       const i = m.i | 0;
       if (i === this.me) return;
-      const g = CS.GunMap[m.g];
-      if (!g || !g.proj) return;
-      const o = m.o || [0, 0, 0], v = m.v || [0, 0, 0];
-      this._addProj(i, m.id, g, o, v);
       const p = this.players[i];
-      if (p) p.flash = 1;
+      const g = this._gunOf(p, m.g, m.s);
+      if (!g || !g.proj) return;
+      const vec = (a) => (Array.isArray(a) && a.length >= 3 ? [num(+a[0]), num(+a[1]), num(+a[2])] : null);
+      const o = vec(m.o) || [0, 0, 0], v = vec(m.v) || [0, 0, 0];
+      const id = num(m.id) | 0;
+      this._addProj(i, id, g, o, v);
+      /* CS2: 散弾（2つめ からの 弾） */
+      if (Array.isArray(m.vs)) {
+        for (let k = 0; k < m.vs.length && k < 40; k++) { const vk = vec(m.vs[k]); if (vk) this._addProj(i, id + k + 1, g, o, vk); }
+      }
+      if (p) { p.flash = 1; if (!p.local) this._sfx(g.sfx, o, 0.85); }
+    }
+
+    /* CS2: その人の 銃（部品つき）。s = 何番目の 銃か。見つからなければ もとの 定義 */
+    _gunOf(p, id, s) {
+      if (p) {
+        const gs = p.guns;
+        if (gs && s !== undefined && gs[s | 0] && gs[s | 0].id === id) return gs[s | 0];
+        if (p.gun && p.gun.id === id) return p.gun;
+        if (gs) for (const q of gs) if (q && q.id === id) return q;
+        if (p.spGun && p.spGun.id === id) return p.spGun;
+      }
+      return (CS.GunMap && CS.GunMap[id]) || null;
     }
 
     _onProjEnd(m) {
@@ -3877,6 +4296,12 @@
       if (!v) return;
       const old = v.hp;
       v.hp = num(m.hp);
+      /* CS2: 回復 */
+      if (m.heal) {
+        this._healFx(v.rpos, 'heal');
+        if (v.idx === this.me && v.hp > old + 0.5) CS.UI.hud.center('+' + Math.round(v.hp - old) + ' 回復', '#8ff0a8', 600);
+        return;
+      }
       const hurt = m.d === 1 || v.hp < old - 0.01;
       if (hurt) v.hitFx = 1;
       if (v.idx === this.me) {
@@ -4013,6 +4438,7 @@
       p.protect = true;
       p.weakUntil = 0;              // v5: よわよわは ふっかつで なおる
       p.frozenUntil = 0;            // v5.1: こおりも
+      if (p.fx) p.fx.slow = p.fx.guard = p.fx.pow = p.fx.spd = 0;     // CS2
       p.pos[0] = q[0]; p.pos[1] = q[1]; p.pos[2] = q[2];
       p.rpos[0] = q[0]; p.rpos[1] = q[1]; p.rpos[2] = q[2];
       p.vel[0] = p.vel[1] = p.vel[2] = 0;
@@ -4160,8 +4586,8 @@
       if (!this.isHost && this.net && this.room) {
         let rec = null;
         for (const p of this.room.players) if (p.id === this.myNetId) { rec = p; break; }
-        const g = this._myGunId(), b = this._myBombId(), g2 = this._myGun2Id();
-        if (!rec || rec.gun !== g || rec.bomb !== b || (rec.gun2 || '') !== g2) this.net.send({ t: 'set', gun: g, gun2: g2, bomb: b });
+        const g = this._myGunId(), b = this._myBombId(), g2 = this._myGun2Id(), gm = this._myGm(), gm2 = this._myGm2();
+        if (!rec || rec.gun !== g || rec.bomb !== b || (rec.gun2 || '') !== g2 || (rec.gm || '') !== gm || (rec.gm2 || '') !== gm2) this.net.send({ t: 'set', gun: g, gun2: g2, gm: gm, gm2: gm2, bomb: b });
       }
       this._emit('toLobby');
       if (this.isHost) this._broadcastLobby();
@@ -4396,7 +4822,27 @@
         const s = Math.max(0.05, p.pr.size || 0.1);
         /* v5.2: 銃のスキン「アイスバー」の人の 弾 */
         if (iceBar(this.players[p.owner])) { this._drawIceBar(r, p.pos, p.vel[0], p.vel[1], p.vel[2], clamp(s / 0.1, 1.5, 2.6)); continue; }
+        /* CS2: 速い弾は 光の 線（うしろへ のびる） */
+        if (p.pr.fast) {
+          const sp = Math.hypot(p.vel[0], p.vel[1], p.vel[2]) || 1;
+          const L = Math.min(1.8, sp * 0.011, p.dist + 0.05);
+          this._tp[0] = p.pos[0] - p.vel[0] / sp * L; this._tp[1] = p.pos[1] - p.vel[1] / sp * L; this._tp[2] = p.pos[2] - p.vel[2] / sp * L;
+          r.line(this._tp, p.pos, p.gun.tracer, Math.max(0.035, (p.gun.tracerWidth || 0.03) * 1.3), 0.95);
+          r.particle(p.pos, Math.max(0.12, s * 2.2), p.gun.tracer, 0.85);
+          continue;
+        }
         this._oEm.emissive = 0.9;
+        /* ブーメランは くるくる まわる */
+        if (p.pr.boomer > 0) {
+          const q = this._bmq || (this._bmq = [0, 0, 0, 1]);
+          const a = p.age * 18, qq = Q.fromAxisAngle([0, 1, 0], a);
+          q[0] = qq[0]; q[1] = qq[1]; q[2] = qq[2]; q[3] = qq[3];
+          M4.fromTRS(this._bmM || (this._bmM = M4.create()), p.pos, q, [s * 1.6, s * 0.3, s * 0.5]);
+          r.box(this._bmM, p.gun.tracer, this._oEm);
+          continue;
+        }
+        /* ブラックホールの 玉は 黒い */
+        if (p.pr.field) { r.cube(p.pos, null, s, [0.05, 0.02, 0.09], this._oDark || (this._oDark = { emissive: 0, frame: 0.01 })); r.particle(p.pos, s * 3.2, p.gun.tracer, 0.8); continue; }
         r.cube(p.pos, null, s, p.gun.tracer, this._oEm);
         r.particle(p.pos, s * 2.6, p.gun.tracer, 0.75);
       }
@@ -4428,6 +4874,19 @@
           this._oSmoke.alpha = 0.3 * fade;
           r.cube(this._tp, null, rr * (0.9 + (k % 3) * 0.2), this._tc, this._oSmoke);
         }
+      }
+
+      /* CS2: ブラックホール */
+      for (let i = 0; i < this.fields.length; i++) {
+        const f = this.fields[i];
+        const life = clamp((f.until - this.time) / 0.4, 0, 1) * clamp((this.time - f.t0) * 4, 0, 1);
+        const rr = f.r * 0.32 * life;
+        const q = this._fq || (this._fq = [0, 0, 0, 1]);
+        const qq = Q.normalize([Math.sin(this.time * 1.7) * 0.4, Math.sin(this.time * 2.3), 0.2, Math.cos(this.time * 2.3)]);
+        q[0] = qq[0]; q[1] = qq[1]; q[2] = qq[2]; q[3] = qq[3];
+        r.cube(f.pos, q, rr, [0.03, 0.01, 0.06], this._oFieldCore || (this._oFieldCore = { emissive: 0, frame: 0.02 }));
+        r.particle(f.pos, f.r * 1.6 * life, [0.55, 0.3, 1.0], 0.28);
+        r.particle(f.pos, f.r * 0.9 * life, [0.85, 0.6, 1.0], 0.35 + 0.1 * Math.sin(this.time * 9));
       }
 
       /* 粒 */
@@ -4554,8 +5013,9 @@
       s.wait = wv; s.waitMode = wm;
       /* v5: いまの銃と もう1つの銃 */
       const two = me.guns && me.guns.length > 1;
-      s.gunNow = g.name || '';
-      s.gunOther = two ? (me.guns[1 - (me.slot | 0)].name || '') : '';
+      const gnm = (x) => (x ? (x.name || '') + (x.partsN > 0 ? ' ＋' + x.partsN : '') : '');
+      s.gunNow = gnm(g);
+      s.gunOther = two ? gnm(me.guns[1 - (me.slot | 0)]) : '';
       s.swapKey = CS.Input.isTouch ? '切替' : 'X';
       if (CS.Input.setSwap) CS.Input.setSwap(two && me.alive && me.spK !== 'smg' && me.spK !== 'tank');
       /* v5: じょうたい（こうげき力ダウン・バブル など） */
@@ -4568,6 +5028,15 @@
       /* v5.2: アイスフィールド（すべる がわ・すべらせる がわ） */
       else if (me.alive && this.iceUntil[me.team] > this.time) stTxt = 'こおりの 床で すべる！ ' + Math.ceil(this.iceUntil[me.team] - this.time) + '秒';
       else if (me.alive && this.iceUntil[1 - me.team] > this.time) stTxt = 'アイスフィールド ' + Math.ceil(this.iceUntil[1 - me.team] - this.time) + '秒（あいてが すべる）';
+      /* CS2: スロー・ガード・パワー・スピード */
+      else if (me.alive && me.fx) {
+        const f = me.fx, t = this.time, L = [];
+        if (f.slow > t) L.push('足が おそい ' + Math.ceil(f.slow - t) + '秒');
+        if (f.guard > t) L.push('ガード ' + Math.ceil(f.guard - t) + '秒');
+        if (f.pow > t) L.push('パワーアップ ' + Math.ceil(f.pow - t) + '秒');
+        if (f.spd > t) L.push('スピードアップ ' + Math.ceil(f.spd - t) + '秒');
+        stTxt = L.join(' ・ ');
+      }
       s.status = stTxt;
       /* v5.4: 大ジャンプ（じゅんびOK / あと なん秒）。-1 = 出さない */
       const bjShow = me.alive && this.phase !== 'over' && !me.spec;
@@ -4820,7 +5289,7 @@
       const b = p.bot, c = b.ctx, v = b.view, s = v.self;
       v.time = this.time; v.world = this.world; v.players = this.players;
       s.idx = p.idx; s.team = p.team; s.pos = p.pos; s.vel = p.vel; s.yaw = p.yaw; s.pitch = p.pitch;
-      s.eye = c.eye; s.grounded = p.grounded; s.alive = p.alive; s.hp = p.hp; s.protect = p.protect; s.sliding = p.sliding;
+      s.eye = c.eye; s.grounded = p.grounded; s.alive = p.alive; s.hp = p.hp; s.maxHp = p.maxHp || RULES.hp; s.protect = p.protect; s.sliding = p.sliding;
       s.gun = p.gun; s.ammo = c.gunState.ammo; s.reloading = c.gunState.reloadT >= 0;
       s.bomb = p.bomb; s.bombCharges = c.bombState.charges;
       /* 行きたい場所（エリアの中の足場 / 塔のぼりは プレイヤーのいる所） */
@@ -4962,6 +5431,7 @@
       }
       /* 4. 弾・ボム・エフェクト */
       this._updateProjectiles(dt);
+      this._updateFields(dt);
       this._updateBombs(dt);
       this._updateTargets(dt);
       this._updateFx(dt);

@@ -260,9 +260,9 @@
       startPlay();
     },
     cpuAgain: function (c) { handlers.cpu(c); },
-    loadoutSaved: function (gunId, bombId, gun2Id) {
+    loadoutSaved: function (gunId, bombId, gun2Id, gm, gm2) {
       CS.UI.setLoadoutLabel();
-      game.setLoadout(gunId, bombId, gun2Id);
+      game.setLoadout(gunId, bombId, gun2Id, gm, gm2);
     },
     ready: function (v) { game.setReady(v); },
     start: function () {
