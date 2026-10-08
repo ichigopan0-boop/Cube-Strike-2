@@ -1,11 +1,15 @@
 /* ==========================================================================
-   CUBE STRIKE — skins.js
-   じぶんのブロックのスキン（v3）。見た目だけで、当たり判定には関係しない。
-   skin = { c: からだの色 '#rrggbb'（'' = チームの色）, c2: 2つめの色, f: かお（8×8 の 64文字）,
-            h: ぼうし id, p: もよう id }
-   ・チームがわかるように、からだの色を変えても 各面のふち（12%）はチームの色のまま（render.js）
-   ・かお f: 上の行から、見ている人の 左→右。'0' = なし、ほかは PIX の色番号
-   ・ぼうしは転がらず、ブロックの上にうかぶ（向きは見ている方向だけ）。もようは からだといっしょに転がる
+   CUBE STRIKE 2 — skins.js
+   じぶんのブロックのスキン。見た目だけで、当たり判定には関係しない。
+   skin = { c: からだの色 '#rrggbb'（'' = チームの色）, c2: 2つめの色, d: お絵かき（6面 × 16×16 ドット・ちぢめた文字列）,
+            h: ぼうし id, p: もよう id, g: 銃のスキン }
+   CS2: 顔だけでなく からだの 6つの 面ぜんぶに 16×16 の ドットで 絵が かける。
+   ・面の じゅんばん（d の 中）: 0 まえ（かお・-Z）/ 1 うしろ（+Z）/ 2 ひだり（+X: かおを 見て 左）/ 3 みぎ（-X）/ 4 うえ / 5 した
+     てんかいず: うえ が まえ の 上・した が まえ の 下・ひだり みぎ が まえ の よこ・うしろ は みぎ の よこ
+   ・1つの 面は 上の行から、見ている人の 左→右 に 256文字。'0' = ぬらない、ほかは PIX の 色
+   ・ちぢめかた（pack）: おなじ 文字が 3つ いじょう つづくと 「文字 + '{' + 数(36しんすう) + '}'」
+   ・チームがわかるように、各面のふち（12%）はチームの色のまま（render.js）
+   ・ぼうしは転がらず、ブロックの上にうかぶ。もようは からだといっしょに転がる
    通信で届いたスキンは clean() を通してから使う。
    ========================================================================== */
 (function () {
@@ -18,24 +22,41 @@
     '#8a5cf6', '#ff6fb5', '#e8eef8', '#8a94a8', '#23262f', '#9a6a3c', '#e8b923', '#8ff0c8'
   ];
 
-  /* ---------- かおの ドットの色（'8' はチームの色） ----------
+  /* ---------- ドットの色（'t' はチームの色） ----------
      [r, g, b, 光りかた 0..1, なまえ] */
   const PIX = {
-    '1': [1.0, 1.0, 1.0, 1, 'しろ'],
+    '1': [1.0, 1.0, 1.0, 0.6, 'しろ'],
     '2': [0.05, 0.06, 0.09, 0, 'くろ'],
-    '3': [1.0, 0.25, 0.30, 0.35, 'あか'],
-    '4': [1.0, 0.88, 0.25, 1, 'きいろ'],
-    '5': [1.0, 0.55, 0.80, 0.45, 'ピンク'],
-    '6': [0.40, 0.90, 1.0, 1, 'みずいろ'],
-    '7': [0.35, 0.90, 0.45, 0.35, 'みどり'],
-    '8': [1.0, 1.0, 1.0, 1, 'チーム'],
-    '9': [1.0, 0.60, 0.20, 0.45, 'オレンジ'],
-    'a': [0.70, 0.45, 1.0, 0.5, 'むらさき'],
-    'b': [0.55, 0.60, 0.70, 0, 'グレー']
+    '3': [1.0, 0.25, 0.30, 0.3, 'あか'],
+    '4': [1.0, 0.88, 0.25, 0.5, 'きいろ'],
+    '5': [1.0, 0.55, 0.80, 0.35, 'ピンク'],
+    '6': [0.40, 0.90, 1.0, 0.5, 'みずいろ'],
+    '7': [0.35, 0.90, 0.45, 0.3, 'みどり'],
+    '9': [1.0, 0.60, 0.20, 0.35, 'オレンジ'],
+    'a': [0.70, 0.45, 1.0, 0.4, 'むらさき'],
+    'b': [0.55, 0.60, 0.70, 0, 'グレー'],
+    'c': [0.80, 0.83, 0.88, 0.1, 'うすグレー'],
+    'd': [0.28, 0.30, 0.36, 0, 'こいグレー'],
+    'e': [0.60, 0.10, 0.15, 0.1, 'えんじ'],
+    'f': [0.55, 0.36, 0.20, 0, 'ちゃいろ'],
+    'g': [0.85, 0.68, 0.45, 0, 'はだいろ'],
+    'h': [1.0, 0.80, 0.65, 0.1, 'ももいろ'],
+    'i': [0.20, 0.35, 0.95, 0.2, 'あお'],
+    'j': [0.10, 0.15, 0.45, 0, 'こん'],
+    'k': [0.10, 0.50, 0.25, 0, 'ふかみどり'],
+    'l': [0.75, 1.0, 0.35, 0.4, 'きみどり'],
+    'm': [1.0, 0.25, 0.85, 0.5, 'マゼンタ'],
+    'n': [1.0, 0.82, 0.30, 0.8, 'きんいろ'],
+    'o': [0.60, 1.0, 0.90, 0.5, 'ミント'],
+    '8': [1.0, 1.0, 1.0, 1, 'チーム']
   };
-  const PIX_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b'];
+  const PIX_KEYS = ['1', 'c', 'b', 'd', '2', '3', 'e', '9', '4', 'n', 'l', '7', 'k', 'o', '6', 'i', 'j', 'a', 'm', '5', 'h', 'g', 'f', '8'];
+  const PIX_RE = /^[0-9a-o]$/;
 
-  /* ---------- かおのプリセット（8行×8文字） ---------- */
+  const N = 16, AREA = N * N, FACES_N = 6;
+  const FACE_NAMES = ['まえ（かお）', 'うしろ', 'ひだり', 'みぎ', 'うえ', 'した'];
+
+  /* ---------- かおのプリセット（8行×8文字 → 16×16 にして まえの面へ） ---------- */
   const F = (rows) => rows.join('');
   const FACES = [
     { id: 'normal', name: 'いつもの', f: F(['........', '........', '..1..1..', '..1..1..', '........', '........', '........', '........']) },
@@ -50,8 +71,49 @@
     { id: 'wink', name: 'ウインク', f: F(['........', '........', '.....1..', '.111.1..', '........', '..2..2..', '...22...', '........']) },
     { id: 'angry', name: 'おこ', f: F(['........', '3......3', '.33..33.', '..1..1..', '..1..1..', '........', '..2222..', '.2....2.']) },
     { id: 'shy', name: 'てれる', f: F(['........', '........', '..1..1..', '..1..1..', '........', '55....55', '...22...', '........']) }
-  ].map((x) => { x.f = x.f.replace(/\./g, '0'); return x; });
-  const DEFAULT_FACE = FACES[0].f;
+  ].map((x) => { x.f = x.f.replace(/\./g, '0'); x.big = up8(x.f); return x; });
+
+  /* 8×8 → 16×16 */
+  function up8(f8) {
+    let s = '';
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) s += f8[(y >> 1) * 8 + (x >> 1)] || '0';
+    return s;
+  }
+  const EMPTY_FACE = '0'.repeat(AREA);
+
+  /* ---------- ちぢめる・もどす ---------- */
+  function pack(raw) {
+    let out = '', i = 0;
+    while (i < raw.length) {
+      const c = raw[i];
+      let n = 1;
+      while (i + n < raw.length && raw[i + n] === c && n < 1295) n++;
+      out += n >= 3 ? c + '{' + n.toString(36) + '}' : c.repeat(n);
+      i += n;
+    }
+    return out;
+  }
+  /* もどす。こわれていたら null */
+  function unpack(s) {
+    if (typeof s !== 'string' || s.length > 4000) return null;
+    let out = '';
+    for (let i = 0; i < s.length;) {
+      const c = s[i];
+      if (!PIX_RE.test(c)) return null;
+      if (s[i + 1] === '{') {
+        const e = s.indexOf('}', i + 2);
+        if (e < 0) return null;
+        const n = parseInt(s.slice(i + 2, e), 36);
+        if (!(n >= 1 && n <= 1536)) return null;
+        out += c.repeat(n);
+        i = e + 1;
+      } else { out += c; i++; }
+      if (out.length > AREA * FACES_N) return null;
+    }
+    return out.length === AREA * FACES_N ? out : null;
+  }
+  const DEFAULT_RAW = FACES[0].big + EMPTY_FACE.repeat(FACES_N - 1);
+  const DEFAULT_D = pack(DEFAULT_RAW);
 
   /* ---------- ぼうし ----------
      box = [cx, cy, cz, sx, sy, sz, 色, 光りかた]  単位 = ブロックの一辺、原点 = ブロックの上の面のまんなか。
@@ -128,8 +190,7 @@
   };
   const HAT_IDS = ['none', 'cat', 'bunny', 'horn', 'crown', 'antenna', 'tophat', 'cap', 'ribbon', 'sprout', 'halo'];
 
-  /* ---------- もよう（からだの面の上。ふちの内側だけ） ----------
-     面ごとの四角 [u0, v0, u1, v1]（-0.5..0.5、ふちの内側 PANEL の中で）。6面ぜんぶに同じものを描く */
+  /* ---------- もよう（からだの面の上。ふちの内側だけ） ---------- */
   const PATTERNS = {
     none: { name: 'なし', rects: [] },
     stripe: { name: 'しましま', rects: [[-0.5, 0.18, 0.5, 0.34], [-0.5, -0.08, 0.5, 0.08], [-0.5, -0.34, 0.5, -0.18]] },
@@ -143,22 +204,30 @@
 
   const HEX = /^#[0-9a-f]{6}$/;
 
+  /* お絵かき（d）を 正しい形に。f（CS1 の 8×8 の かお）が あれば まえの面に する */
+  function cleanD(s) {
+    let raw = null;
+    if (s && typeof s.d === 'string') raw = unpack(s.d);
+    if (!raw && s && typeof s.f === 'string' && /^[0-9ab]{64}$/.test(s.f.toLowerCase())) raw = up8(s.f.toLowerCase()) + EMPTY_FACE.repeat(FACES_N - 1);
+    if (!raw) raw = DEFAULT_RAW;
+    return pack(raw);
+  }
+
   function clean(s) {
     if (!s || typeof s !== 'object') return null;
     const c = typeof s.c === 'string' && HEX.test(s.c.toLowerCase()) ? s.c.toLowerCase() : '';
     const c2 = typeof s.c2 === 'string' && HEX.test(s.c2.toLowerCase()) ? s.c2.toLowerCase() : '#ffffff';
-    let f = typeof s.f === 'string' ? s.f.toLowerCase() : '';
-    if (!/^[0-9ab]{64}$/.test(f)) f = DEFAULT_FACE;
+    const d = cleanD(s);
     const h = HATS[s.h] ? s.h : 'none';
     const p = PATTERNS[s.p] ? s.p : 'none';
     /* g = 銃のスキン（gunskins.js）。しあいでも いっしょに届く */
     const g = CS.GunSkins ? CS.GunSkins.clean(s.g) : 'none';
-    return { c: c, c2: c2, f: f, h: h, p: p, g: g };
+    return { c: c, c2: c2, d: d, h: h, p: p, g: g };
   }
 
   /* からだが いつもの見た目と同じか（そのときは からだの描き方も いつものまま） */
   function isPlainBody(s) {
-    return !s || (!s.c && s.f === DEFAULT_FACE && s.h === 'none' && s.p === 'none');
+    return !s || (!s.c && s.d === DEFAULT_D && s.h === 'none' && s.p === 'none');
   }
   /* 銃のスキンも ふくめて いつもどおりか（通信で送らなくてよいか） */
   function isPlain(s) {
@@ -173,25 +242,37 @@
     return out;
   }
 
-  /* かおを 横につながった同じ色の帯にまとめる（箱の数をへらす）。[行, 列, はば, 色] の列。かおの文字列ごとにおぼえる */
-  const faceCache = new Map();
-  function faceRuns(f) {
-    let r = faceCache.get(f);
+  /* お絵かきを 面ごとの 四角に まとめる（おなじ色の かたまりを 大きな 四角に。箱の数を へらす）。
+     [面][...] = [列, 行, はば, たかさ, 色]。d（ちぢめた文字列）ごとに おぼえる */
+  const rectCache = new Map();
+  function faceRects(d) {
+    let r = rectCache.get(d);
     if (r) return r;
+    const raw = unpack(d) || DEFAULT_RAW;
     r = [];
-    for (let y = 0; y < 8; y++) {
-      let x = 0;
-      while (x < 8) {
-        const k = f[y * 8 + x];
-        if (k === '0') { x++; continue; }
-        let w = 1;
-        while (x + w < 8 && f[y * 8 + x + w] === k) w++;
-        r.push([y, x, w, k]);
-        x += w;
+    for (let f = 0; f < FACES_N; f++) {
+      const g = raw.slice(f * AREA, (f + 1) * AREA).split('');
+      const used = new Uint8Array(AREA);
+      const list = [];
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const i = y * N + x, k = g[i];
+          if (k === '0' || used[i]) continue;
+          let w = 1;
+          while (x + w < N && g[i + w] === k && !used[i + w]) w++;
+          let h = 1;
+          outer: while (y + h < N) {
+            for (let q = 0; q < w; q++) { const j = (y + h) * N + x + q; if (g[j] !== k || used[j]) break outer; }
+            h++;
+          }
+          for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) used[(y + yy) * N + x + xx] = 1;
+          list.push([x, y, w, h, k]);
+        }
       }
+      r.push(list);
     }
-    if (faceCache.size > 64) faceCache.clear();
-    faceCache.set(f, r);
+    if (rectCache.size > 80) rectCache.clear();
+    rectCache.set(d, r);
     return r;
   }
 
@@ -202,7 +283,7 @@
     return clean({
       c: opts.teamColor ? '' : pickOne(COLORS),
       c2: pickOne(COLORS),
-      f: pickOne(FACES).f,
+      d: pack(pickOne(FACES).big + EMPTY_FACE.repeat(FACES_N - 1)),
       h: pickOne(HAT_IDS),
       p: opts.noPattern ? 'none' : pickOne(PATTERN_IDS)
     });
@@ -215,14 +296,14 @@
     const s = clean(Object.assign({}, base, { g: CS.Settings ? CS.Settings.gunSkin : 'none' }));
     return s && !isPlain(s) ? s : null;
   }
-  function blank() { return { c: '', c2: '#ffffff', f: DEFAULT_FACE, h: 'none', p: 'none' }; }
+  function blank() { return { c: '', c2: '#ffffff', d: DEFAULT_D, h: 'none', p: 'none' }; }
 
   CS.Skins = {
-    COLORS: COLORS, PIX: PIX, PIX_KEYS: PIX_KEYS, FACES: FACES, DEFAULT_FACE: DEFAULT_FACE,
+    COLORS: COLORS, PIX: PIX, PIX_KEYS: PIX_KEYS, FACES: FACES, N: N, FACES_N: FACES_N, FACE_NAMES: FACE_NAMES,
+    DEFAULT_D: DEFAULT_D, DEFAULT_RAW: DEFAULT_RAW, EMPTY_FACE: EMPTY_FACE, DEFAULT_FACE: FACES[0].f,
     HATS: HATS, HAT_IDS: HAT_IDS, PATTERNS: PATTERNS, PATTERN_IDS: PATTERN_IDS,
-    PANEL: 0.76,          // もよう・からだの色を ぬる面の大きさ（のこりの ふち がチームの色）
-    FACE_SIZE: 0.84,      // かお（8×8）の大きさ
-    clean: clean, isPlain: isPlain, isPlainBody: isPlainBody, hexRgb: hexRgb, faceRuns: faceRuns, random: randomSkin, mine: mine,
-    blank: blank
+    PANEL: 0.76,          // もよう・からだの色・お絵かきを ぬる面の大きさ（のこりの ふち がチームの色）
+    clean: clean, isPlain: isPlain, isPlainBody: isPlainBody, hexRgb: hexRgb, faceRects: faceRects, random: randomSkin, mine: mine,
+    blank: blank, pack: pack, unpack: unpack, up8: up8
   };
 })();

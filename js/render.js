@@ -1184,17 +1184,31 @@
           }
         }
       }
-      /* 3) かお（-Z の面。見ている人の左 = +X） */
-      const runs = SK.faceRuns(skin.f), FS = SK.FACE_SIZE, px = FS / 8;
-      for (let i = 0; i < runs.length; i++) {
-        const run = runs[i], k = run[3], pc = SK.PIX[k];
-        if (!pc) continue;
-        let r = pc[0], g = pc[1], b = pc[2];
-        if (k === '8') { r = 1 + (tc[0] - 1) * 0.55; g = 1 + (tc[1] - 1) * 0.55; b = 1 + (tc[2] - 1) * 0.55; }
-        const x0 = FS / 2 - run[1] * px, x1 = x0 - run[2] * px;
-        const y1 = FS / 2 - run[0] * px, y0 = y1 - px;
-        boxInto(this._B, M, (x0 + x1) / 2, (y0 + y1) / 2, -(0.5 + T * 2.5), (x0 - x1) * 0.97, px * 0.97, T);
-        this._emitLit(pass, this._B, W(r), W(g), W(b), alpha, Math.max(pc[3], em), 0);
+      /* 3) お絵かき（CS2: 6つの 面に 16×16）。面ごとの 四角を 立方体の 面へ */
+      const F = SK.faceRects(skin.d), NN = SK.N || 16, px = PAN / NN, off = 0.5 + T * 2.5;
+      for (let f = 0; f < F.length; f++) {
+        const list = F[f];
+        for (let i = 0; i < list.length; i++) {
+          const q = list[i], k = q[4], pc = SK.PIX[k];
+          if (!pc) continue;
+          let r = pc[0], g = pc[1], b = pc[2];
+          if (k === '8') { r = 1 + (tc[0] - 1) * 0.55; g = 1 + (tc[1] - 1) * 0.55; b = 1 + (tc[2] - 1) * 0.55; }
+          const u0 = -PAN / 2 + q[0] * px, u1 = u0 + q[2] * px;
+          const v1 = PAN / 2 - q[1] * px, v0 = v1 - q[3] * px;
+          const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2, uw = (u1 - u0) * 0.985, vh = (v1 - v0) * 0.985;
+          /* 面ごとの むき（見ている人の 右・上 → 立方体の 座標） */
+          let cx, cy, cz, sx, sy, sz;
+          switch (f) {
+            case 0: cx = -uc; cy = vc; cz = -off; sx = uw; sy = vh; sz = T; break;      // まえ（-Z）
+            case 1: cx = uc; cy = vc; cz = off; sx = uw; sy = vh; sz = T; break;        // うしろ（+Z）
+            case 2: cx = off; cy = vc; cz = -uc; sx = T; sy = vh; sz = uw; break;       // ひだり（+X）
+            case 3: cx = -off; cy = vc; cz = uc; sx = T; sy = vh; sz = uw; break;       // みぎ（-X）
+            case 4: cx = -uc; cy = off; cz = vc; sx = uw; sy = T; sz = vh; break;       // うえ（+Y）
+            default: cx = -uc; cy = -off; cz = -vc; sx = uw; sy = T; sz = vh; break;    // した（-Y）
+          }
+          boxInto(this._B, M, cx, cy, cz, sx, sy, sz);
+          this._emitLit(pass, this._B, W(r), W(g), W(b), alpha, Math.max(pc[3], em), 0);
+        }
       }
     }
 

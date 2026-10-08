@@ -859,7 +859,7 @@ body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
 .edForm select{grid-column:2}
 
 /* ================= スキン ================= */
-.skWrap{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:14px;width:100%;align-items:start;text-align:left}
+.skWrap{display:grid;grid-template-columns:minmax(0,280px) minmax(0,1fr);gap:14px;width:100%;align-items:start;text-align:left}
 @media (max-width:700px){.skWrap{grid-template-columns:1fr}}
 .skPrev{padding:10px;display:flex;flex-direction:column;align-items:center;gap:8px;position:sticky;top:0;z-index:1}
 #skCanvas{width:100%;height:240px;display:block;border-radius:12px;background:#070b1c;touch-action:none;cursor:grab}
@@ -881,13 +881,20 @@ body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
 .face small{font-size:10.5px}
 .face.sel{border-color:#7fd6ff;box-shadow:0 0 0 2px rgba(127,214,255,.45)}
 .skPaint{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
-.skGrid{--body:#ff4d5e;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;width:min(264px,72vw);aspect-ratio:1;padding:6px;border-radius:12px;
-  background:var(--body);box-shadow:inset 0 0 0 4px rgba(0,0,0,.18);touch-action:none;cursor:crosshair}
-.skGrid i{display:block;border-radius:2px;background:transparent;outline:1px dashed rgba(255,255,255,.22);outline-offset:-1px}
-.skPix{display:grid;grid-template-columns:repeat(4,36px);gap:6px}
-.px{cursor:pointer;width:36px;height:36px;border-radius:8px;border:2px solid rgba(255,255,255,.2);font-family:inherit;font-weight:900;color:#fff;font-size:14px;
-  background:rgba(255,255,255,.06);text-shadow:0 1px 2px #000}
+.skGrid{--body:#ff4d5e;display:grid;grid-template-columns:repeat(16,1fr);gap:1px;width:min(380px,88vw);aspect-ratio:1;padding:5px;border-radius:12px;
+  background:var(--body);box-shadow:inset 0 0 0 4px rgba(0,0,0,.18);touch-action:none;cursor:crosshair;user-select:none;-webkit-user-select:none}
+.skGrid i{display:block;border-radius:1px;background:transparent;outline:1px dashed rgba(255,255,255,.16);outline-offset:-1px}
+.skGrid i.c8{outline-color:rgba(0,0,0,.25)}
+.skTools{display:flex;flex-direction:column;gap:8px;flex:1 1 220px;min-width:0}
+.skPix{display:grid;grid-template-columns:repeat(auto-fill,34px);gap:5px}
+.px{cursor:pointer;width:34px;height:34px;border-radius:8px;border:2px solid rgba(255,255,255,.2);font-family:inherit;font-weight:900;color:#fff;font-size:13px;
+  background:rgba(255,255,255,.06);text-shadow:0 1px 2px #000;padding:0}
 .px.sel{border-color:#fff;box-shadow:0 0 0 2px #7fd6ff}
+.skNet{display:grid;grid-template-columns:repeat(4,52px);grid-template-rows:repeat(3,52px);gap:3px;align-self:center}
+.skNet button{width:52px;height:52px;padding:2px;border-radius:6px;border:2px solid rgba(255,255,255,.18);background:rgba(0,0,0,.25);cursor:pointer}
+.skNet button canvas{width:100%;height:100%;image-rendering:pixelated;display:block;border-radius:3px}
+.skNet button.sel{border-color:#7fd6ff;box-shadow:0 0 0 2px rgba(127,214,255,.5)}
+.btn.sm.sel{border-color:#7fd6ff;background:rgba(70,140,255,.25)}
 .skChips{display:flex;flex-wrap:wrap;gap:6px}
 </style>
 </head>
@@ -1369,8 +1376,8 @@ body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
 
 <!-- ============ スキン ============ -->
 <section id="scSkin" class="screen">
-  <div class="panel wide" style="max-width:880px">
-    <h2>スキン</h2>
+  <div class="panel wide" style="max-width:1000px">
+    <h2>お絵かきアトリエ</h2>
     <div class="skWrap">
       <div class="skPrev glass">
         <canvas id="skCanvas"></canvas>
@@ -1379,13 +1386,30 @@ body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
           <button class="btn ghost sm" type="button" data-skteam="1">あおチームで見る</button>
         </div>
         <p class="hint">ドラッグで まわせるよ。まわりの ふち は チームの色のまま。</p>
+        <h3 style="align-self:flex-start;margin:4px 0 0">てんかいず <span style="font-size:11px;color:#7890b4;font-weight:500">おすと その面を かく</span></h3>
+        <div id="skNet" class="skNet"></div>
       </div>
       <div class="skEdit">
+        <h3>お絵かき <span>からだの 6つの 面に 16×16 の ドットで かけるよ</span></h3>
+        <div id="skFaceTabs" class="skChips"></div>
+        <div class="skPaint">
+          <div id="skGrid" class="skGrid"></div>
+          <div class="skTools">
+            <div id="skToolBtns" class="skChips"></div>
+            <div id="skPix" class="skPix"></div>
+            <div class="skChips">
+              <button id="skUndo" class="btn ghost sm" type="button">もどす</button>
+              <button id="skMirror" class="btn ghost sm" type="button">左右はんてん</button>
+              <button id="skCopyAll" class="btn ghost sm" type="button">この面を ぜんぶに コピー</button>
+              <button id="skClearFace" class="btn ghost sm" type="button">この面を けす</button>
+              <button id="skClearAll" class="btn ghost sm" type="button">ぜんぶ けす</button>
+            </div>
+          </div>
+        </div>
+        <h3>かおの プリセット <span>まえ（かお）の面に かく</span></h3>
+        <div id="skFaces" class="skFaces"></div>
         <h3>からだの色</h3>
         <div id="skColors" class="skSw"></div>
-        <h3>かお <span>プリセットを えらぶか、マスを タップして じぶんで かこう</span></h3>
-        <div id="skFaces" class="skFaces"></div>
-        <div class="skPaint"><div id="skGrid" class="skGrid"></div><div id="skPix" class="skPix"></div></div>
         <h3>もよう</h3>
         <div id="skPats" class="skChips"></div>
         <h3>2つめの色 <span>もよう・ぼうしに つかう</span></h3>
