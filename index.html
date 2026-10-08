@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>CUBE STRIKE 2 キューブストライク2</title>
+<meta name="description" content="ブロックになって転がって撃ち合う、チーム対戦FPS。コードを送れば友達とすぐ遊べる。1対1〜3対3・4つのルール・コンピューター対戦・ひとりで挑む塔のぼり・スキン作り・フレンド・マップエディターも。スマホ・タブレット・PC対応。">
+<meta name="theme-color" content="#04060f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+/* ================= ベース ================= */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none;touch-action:manipulation}
+body{background:#04060f;color:#dfe9ff;
+  font-family:"Outfit","Segoe UI","Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-text-size-adjust:100%}
+input,select{user-select:text;-webkit-user-select:text}
+button{font-family:inherit;color:inherit;touch-action:manipulation}
+#cv{position:fixed;left:0;top:0;width:100vw;height:100vh;height:100dvh;display:block;touch-action:none;background:#04060f;z-index:0}
+:root{--safeT:env(safe-area-inset-top,0px);--safeR:env(safe-area-inset-right,0px);--safeB:env(safe-area-inset-bottom,0px);--safeL:env(safe-area-inset-left,0px);
+  --cyan:#7fd6ff;--red:#ff4d5e;--blue:#3da2ff;--pink:#ff5ea8;--team:#7fd6ff}
+
+/* ================= 画面（メニュー） ================= */
+.screen{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;
+  overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;
+  padding:calc(18px + var(--safeT)) calc(14px + var(--safeR)) calc(22px + var(--safeB)) calc(14px + var(--safeL));
+  background:radial-gradient(ellipse at 50% -10%,rgba(28,44,96,.94) 0%,rgba(6,9,22,.96) 55%,rgba(3,4,10,.98) 100%)}
+.screen.on{display:flex}
+.screen::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;opacity:.5;
+  background-image:linear-gradient(rgba(127,214,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(127,214,255,.05) 1px,transparent 1px);
+  background-size:36px 36px;-webkit-mask-image:linear-gradient(180deg,transparent,#000 60%);mask-image:linear-gradient(180deg,transparent,#000 60%)}
+#scMenu{background:rgba(3,5,14,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#scMenu::before{display:none}
+.panel{margin:auto;width:100%;max-width:560px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.panel.wide{max-width:980px}
+.glass{background:linear-gradient(180deg,rgba(40,60,120,.22),rgba(10,16,36,.35));border:1px solid rgba(127,214,255,.18);
+  border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.05)}
+h2{font-size:clamp(19px,4.6vw,26px);font-weight:800;letter-spacing:.16em;color:#dff0ff;text-shadow:0 0 18px rgba(127,214,255,.35)}
+h3{font-size:14px;font-weight:700;letter-spacing:.14em;color:#9fd4ff;text-align:left;width:100%}
+.lead{font-size:13.5px;line-height:1.85;color:#a9bddb;max-width:460px}
+.hint{font-size:11.5px;letter-spacing:.06em;color:#7890b4;line-height:1.6}
+.msg{font-size:13px;min-height:19px;color:#9fd4ff;letter-spacing:.04em;line-height:1.5}
+.msg.warn{color:#ffb3c0}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;width:100%}
+.stack{display:flex;flex-direction:column;gap:10px;width:100%;max-width:360px}
+
+/* ボタン */
+.btn{position:relative;min-height:50px;padding:12px 22px;font-size:16px;font-weight:700;letter-spacing:.12em;cursor:pointer;
+  color:#eaf4ff;border-radius:12px;transition:transform .12s,box-shadow .14s,background .14s,opacity .14s;
+  background:linear-gradient(180deg,rgba(60,120,230,.55),rgba(20,40,96,.65));border:1px solid rgba(130,190,255,.5)}
+.btn small{display:block;font-size:11px;font-weight:500;letter-spacing:.04em;color:#a9c8ee;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn:active{transform:translateY(1px) scale(.99)}
+@media (hover:hover){.btn:hover{box-shadow:0 0 24px rgba(90,170,255,.45);background:linear-gradient(180deg,rgba(90,160,255,.72),rgba(30,60,130,.8))}}
+.btn.pink{background:linear-gradient(180deg,rgba(255,70,140,.5),rgba(120,20,60,.62));border-color:rgba(255,130,180,.6)}
+@media (hover:hover){.btn.pink:hover{background:linear-gradient(180deg,rgba(255,110,170,.72),rgba(150,30,80,.8));box-shadow:0 0 24px rgba(255,80,150,.45)}}
+.btn.green{background:linear-gradient(180deg,rgba(60,210,140,.5),rgba(10,80,60,.62));border-color:rgba(120,240,190,.6)}
+.btn.ghost{background:rgba(255,255,255,.04);border-color:rgba(160,190,230,.28);color:#bcd0ea;font-size:14px;min-height:44px;padding:9px 18px}
+.btn.big{min-height:60px;font-size:18px}
+.btn:disabled{opacity:.38;cursor:default;transform:none;box-shadow:none;filter:saturate(.5)}
+.btn.sel{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(127,214,255,.55),0 0 22px rgba(127,214,255,.35);
+  background:linear-gradient(180deg,rgba(70,150,255,.6),rgba(20,60,130,.7))}
+
+input[type=text]{font-family:inherit;font-size:18px;letter-spacing:.08em;text-align:center;padding:11px 14px;width:100%;max-width:300px;border-radius:12px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(140,190,255,.4);color:#eaf4ff;outline:none;min-height:48px}
+input[type=text]:focus{border-color:var(--cyan);box-shadow:0 0 18px rgba(90,190,255,.35)}
+select{font-family:inherit;font-size:15px;padding:9px 12px;border-radius:10px;min-height:44px;
+  background:#0d1530;border:1px solid rgba(140,190,255,.4);color:#eaf4ff;outline:none}
+
+/* ================= タイトル ================= */
+#scTitle .panel{gap:14px;padding-bottom:70px}
+.logo{margin-top:6px;line-height:1;font-weight:900;letter-spacing:.08em;font-size:clamp(40px,12.5vw,86px);white-space:nowrap;
+  background:linear-gradient(180deg,#f4faff 8%,#7fd6ff 52%,#ff5ea8 96%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 22px rgba(90,170,255,.55));animation:logoGlow 3.2s ease-in-out infinite}
+.logo .cb{display:inline-block;width:.62em;height:.62em;margin:0 .08em 0 .02em;vertical-align:.02em;border-radius:.09em;
+  background:linear-gradient(135deg,#ff6b7a,#ff4d5e 45%,#b3263a);box-shadow:inset -.05em -.05em 0 rgba(0,0,0,.25),0 0 .3em rgba(255,77,94,.7);
+  position:relative;transform:rotate(-8deg)}
+.logo .cb::before,.logo .cb::after{content:"";position:absolute;top:.2em;width:.1em;height:.14em;background:#fff;border-radius:.02em;box-shadow:0 0 .12em #fff}
+.logo .cb::before{left:.16em}.logo .cb::after{right:.16em}
+.logo .two{display:inline-block;margin-left:.12em;padding:0 .14em;border-radius:.12em;color:#fff;background:linear-gradient(135deg,#ff5ea8,#7f5cff);-webkit-text-fill-color:#fff;box-shadow:0 0 .3em rgba(255,94,168,.6);font-size:.8em;vertical-align:.08em}
+@keyframes logoGlow{0%,100%{filter:drop-shadow(0 0 18px rgba(90,170,255,.45))}50%{filter:drop-shadow(0 0 34px rgba(255,94,168,.55))}}
+.kana{font-size:clamp(11px,2.8vw,14px);letter-spacing:.62em;color:#86b2e0;margin:2px 0 0 .62em;font-weight:600}
+.titleLead{font-size:clamp(13px,3.4vw,15.5px);line-height:1.9;color:#bcd0ea;max-width:430px;margin:4px 0 2px}
+.titleLead b{color:#fff;font-weight:700}
+.nameRow{display:flex;align-items:center;gap:8px;width:100%;max-width:360px}
+.nameRow label{font-size:12px;letter-spacing:.14em;color:#8fb0d8;white-space:nowrap}
+#inName{max-width:none;flex:1;font-size:17px}
+#btnLoadoutOpen small{color:#ffd28a}
+.titleFoot{display:flex;gap:18px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:4px}
+.titleFoot a{color:#86a8d4;font-size:13px;letter-spacing:.1em;text-decoration:none;padding:8px 6px}
+.titleFoot a:hover{color:var(--cyan)}
+.ver{font-size:11px;color:#50658a;letter-spacing:.1em}
+/* 転がるキューブ */
+.floor{position:fixed;left:0;right:0;bottom:calc(10px + var(--safeB));height:52px;pointer-events:none;z-index:-1;overflow:hidden}
+.floor::after{content:"";position:absolute;left:0;right:0;bottom:6px;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(127,214,255,.6) 20%,rgba(255,94,168,.6) 80%,transparent);box-shadow:0 0 12px rgba(127,214,255,.6)}
+.roller{position:absolute;left:0;bottom:8px;width:var(--s);height:var(--s);animation:rollX var(--dur,24s) linear infinite;animation-delay:var(--delay,0s);will-change:transform}
+.roller i{position:absolute;inset:0;border-radius:3px;background:var(--c);transform-origin:50% 50%;
+  box-shadow:inset -3px -3px 0 rgba(0,0,0,.28),inset 2px 2px 0 rgba(255,255,255,.22),0 0 14px var(--c);
+  animation:rollSpin var(--spin,.62s) linear infinite}
+.roller i::before,.roller i::after{content:"";position:absolute;top:28%;width:14%;height:22%;background:#fff;border-radius:1px}
+.roller i::before{left:24%}.roller i::after{right:24%}
+@keyframes rollX{from{transform:translateX(-60px)}to{transform:translateX(var(--travel,110vw))}}
+@keyframes rollSpin{0%{transform:translateY(0) rotate(0)}50%{transform:translateY(calc(var(--s) * -.207)) rotate(45deg)}100%{transform:translateY(0) rotate(90deg)}}
+@media (prefers-reduced-motion:reduce){.roller,.roller i,.logo{animation:none}.roller{transform:translateX(30vw)}}
+
+/* ================= へやを作る ================= */
+.seg{display:flex;gap:10px;width:100%;max-width:460px}
+.seg .btn{flex:1;min-width:0;padding-left:10px;padding-right:10px}
+.seg .btn b{display:block;font-size:22px;letter-spacing:.06em}
+#mapGrid,#cpuMapGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;width:100%}
+.mapCard{cursor:pointer;text-align:left;padding:0;border-radius:14px;overflow:hidden;min-height:120px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);transition:border-color .14s,box-shadow .14s,transform .12s;display:flex;flex-direction:column}
+.mapCard:active{transform:scale(.99)}
+.mapCard .thumb{height:64px;position:relative;overflow:hidden;background:linear-gradient(160deg,#161f44,#0a0f24)}
+.mapCard .thumb span{position:absolute;border-radius:2px;box-shadow:0 0 10px currentColor;background:currentColor}
+.mapCard .thumb em{position:absolute;right:10px;bottom:6px;font-style:normal;font-weight:800;font-size:13px;letter-spacing:.18em;color:rgba(255,255,255,.75)}
+.mapCard .mi{padding:8px 12px 11px}
+.mapCard .mn{font-size:15px;font-weight:800;letter-spacing:.08em;color:#eaf4ff}
+.mapCard .md{display:block;font-size:11.5px;color:#9fb4d4;line-height:1.55;margin-top:3px}
+.mapCard.sel{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(127,214,255,.5),0 0 24px rgba(127,214,255,.3)}
+.mapCard.sel .mn::after{content:" ✓";color:var(--cyan)}
+
+/* ================= コンピューターと対戦 ================= */
+#btnCpu{background:linear-gradient(180deg,rgba(140,95,255,.52),rgba(46,22,112,.66));border-color:rgba(190,160,255,.6)}
+@media (hover:hover){#btnCpu:hover{background:linear-gradient(180deg,rgba(165,125,255,.74),rgba(66,32,146,.82));box-shadow:0 0 24px rgba(150,110,255,.45)}}
+#btnCpu small{color:#d8ccff}
+#scCpu .panel{gap:10px}
+#scCpu h3{margin-top:4px}
+.lvGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;width:100%}
+.lvCard{cursor:pointer;font-family:inherit;color:#eaf4ff;text-align:left;padding:10px 12px 11px 13px;border-radius:13px;min-height:64px;
+  display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);border-left:4px solid var(--lv);
+  transition:border-color .14s,box-shadow .14s,background .14s,transform .12s}
+.lvCard:active{transform:scale(.99)}
+@media (hover:hover){.lvCard:hover{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03))}}
+.lvCard b{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:16px;font-weight:800;letter-spacing:.08em}
+.lvCard b i{font-style:normal;font-size:11.5px;font-weight:700;letter-spacing:.12em;color:var(--lv);white-space:nowrap}
+.lvCard small{display:block;font-size:11.5px;line-height:1.5;color:#a9bddb;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvCard.sel{border-color:var(--lv);border-left-width:4px;background:linear-gradient(180deg,rgba(70,140,255,.22),rgba(20,50,110,.28));
+  box-shadow:0 0 0 1px var(--lv),0 0 20px rgba(127,214,255,.2)}
+.lvCard b span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvCard.sel b span::after{content:" ✓";color:var(--lv)}
+.lv-flee{--lv:#6ff0b0}.lv-easy{--lv:#7fd6ff}.lv-normal{--lv:#ffd28a}.lv-hard{--lv:#ff6b7a}
+#cpuMapGrid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+#cpuMapGrid .mapCard{min-height:96px}
+#cpuMapGrid .mapCard .thumb{height:44px}
+.cpuGears{width:100%;display:flex;flex-direction:column}
+.cpuGear{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px 9px 14px;text-align:left}
+.cpuGear + .cpuGear{border-top:1px solid rgba(127,214,255,.12)}
+.cpuGear.off{display:none}
+.cpuGear .gl i{font-style:normal;color:#ffd28a}
+.cpuGear .gl{flex:1;min-width:0;font-size:13.5px;line-height:1.45;color:#eaf4ff;font-weight:700}
+.cpuGear .gl small{display:block;font-size:11px;font-weight:500;letter-spacing:.12em;color:#8fb0d8}
+.cpuGear .gl span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cpuGear .btn{flex:none;min-height:42px;padding:8px 14px;font-size:13px;letter-spacing:.06em}
+@media (max-width:480px){
+  .lvGrid{grid-template-columns:1fr;gap:7px}
+  .lvCard{min-height:56px;padding:8px 12px 9px 13px}
+}
+
+/* ================= コードで参加 ================= */
+#inCode{font-size:clamp(30px,10vw,44px);font-weight:800;letter-spacing:.34em;text-transform:uppercase;max-width:340px;padding:12px 4px 12px 16px;color:var(--cyan);text-shadow:0 0 18px rgba(127,214,255,.45)}
+#inCode::placeholder{color:rgba(127,214,255,.22);letter-spacing:.34em}
+
+/* ================= ぶきをえらぶ ================= */
+#scLoadout .panel{margin-top:0;gap:10px;padding-bottom:10px}
+#gunGrid{width:100%;display:flex;flex-direction:column;gap:2px}
+.lnav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.lnav .btn{min-height:38px;padding:6px 16px;font-size:13px}
+.note{font-size:12.5px;color:#ffd28a;letter-spacing:.06em;background:rgba(255,190,90,.08);border:1px solid rgba(255,190,90,.25);border-radius:20px;padding:5px 14px}
+.grp{width:100%;display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.grp h3 span{font-size:11px;color:#7890b4;letter-spacing:.06em;margin-left:8px;font-weight:500}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px;width:100%}
+.wcard{position:relative;cursor:pointer;text-align:left;padding:10px 11px 11px;border-radius:13px;display:flex;flex-direction:column;gap:4px;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);transition:border-color .14s,box-shadow .14s,background .14s}
+.wcard:active{transform:scale(.99)}
+@media (hover:hover){.wcard:hover{border-color:rgba(140,200,255,.45)}}
+.wcard .top{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:34px}
+.wcard .top>span:first-child{display:flex;align-items:center;min-width:0;max-width:72%}
+.wcard svg{height:32px;width:auto;max-width:100%;display:block;overflow:visible;filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
+.tag{font-size:10.5px;letter-spacing:.06em;padding:2px 8px;border-radius:20px;border:1px solid rgba(140,200,255,.35);color:#9fd4ff;white-space:nowrap}
+.wcard .wn{display:block;font-size:15px;font-weight:800;letter-spacing:.04em;color:#f0f6ff}
+.wcard .wd{display:block;font-size:11.5px;color:#a3b8d8;line-height:1.5;min-height:2.9em}
+.wcard .ws{display:block;font-size:10.5px;color:#7f96ba;letter-spacing:.02em}
+.stats{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:center;margin-top:3px}
+.stats em{font-style:normal;font-size:10.5px;color:#8ea6c8;white-space:nowrap;letter-spacing:.02em}
+.sbar{height:7px;border-radius:4px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
+.sbar b{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:linear-gradient(90deg,#3da2ff,#7fd6ff);box-shadow:0 0 8px rgba(127,214,255,.5)}
+.sbar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(20% - 2px),#0b1128 calc(20% - 2px),#0b1128 20%)}
+.bombs .sbar b{background:linear-gradient(90deg,#ff5ea8,#ffb86b)}
+.wcard.sel{border-color:var(--cyan);background:linear-gradient(180deg,rgba(70,140,255,.26),rgba(20,50,110,.3));box-shadow:0 0 0 2px rgba(127,214,255,.55),0 0 22px rgba(127,214,255,.28)}
+.wcard.sel::after{content:"✓ えらんだ";position:absolute;right:8px;bottom:8px;font-size:10.5px;font-weight:700;color:#04060f;background:var(--cyan);border-radius:12px;padding:2px 8px}
+.bombs .wcard.sel{border-color:#ff9ac8;box-shadow:0 0 0 2px rgba(255,120,190,.5),0 0 22px rgba(255,94,168,.25)}
+.bombs .wcard.sel::after{background:#ff9ac8}
+/* v5: 銃は 2つ（メイン・サブ） */
+.gunSlots{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:4px 0 2px;width:100%}
+.gunSlots .slot{min-width:170px;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:5px 14px}
+.gunSlots .slot small{font-size:10.5px;color:#9fb4d4;letter-spacing:.08em}
+.gunSlots .slot b{font-size:14px}
+.gunSlots .slot.sel{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(127,214,255,.5)}
+.gunSlots .slot[data-slot="1"].sel{border-color:#ffd28a;box-shadow:0 0 0 2px rgba(255,210,138,.5)}
+.gunSlots .hint{flex-basis:100%;text-align:center;margin:0;font-size:11.5px}
+#scLoadout.cpuPick .gunSlots{display:none}
+.slotWrap{display:flex;flex-direction:column;gap:4px}
+.slotWrap .slot.empty{width:100%}
+.slotWrap .addCpu{min-height:30px;font-size:12px;padding:4px 10px}
+.slot.cpu{border-style:dashed}
+.cpuRow{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+.cpuRow .btn{min-height:28px;font-size:11.5px;padding:3px 10px}
+.cpuLv{font-size:11.5px;color:#9fb4d4}
+#gunGrid .wcard.sel::after{content:"✓ メイン"}
+#scLoadout.cpuPick #gunGrid .wcard.sel::after{content:"✓ えらんだ"}
+#gunGrid .wcard.sel2{border-color:#ffd28a;box-shadow:0 0 0 2px rgba(255,210,138,.45)}
+#gunGrid .wcard.sel2::after{content:"✓ サブ";position:absolute;right:8px;bottom:8px;font-size:10.5px;font-weight:700;color:#04060f;background:#ffd28a;border-radius:12px;padding:2px 8px}
+#gunGrid .wcard.sel.sel2::after{content:"✓ メイン＋サブ";background:linear-gradient(90deg,var(--cyan),#ffd28a)}
+#scLoadout.cpuPick #partsSec,#scLoadout.cpuPick #presetSec,#scLoadout.cpuPick .lnav [data-jump=partsSec],#scLoadout.cpuPick .lnav [data-jump=presetSec]{display:none}
+/* CPU のぶきをえらぶときだけ「おまかせ（ランダム）」のカードを出す */
+.rndOnly{display:none!important}
+#scLoadout.cpuPick .rndOnly{display:flex!important}
+.wcard.rnd .dice{font-size:26px;line-height:32px;height:32px}
+#scLoadout.cpuPick .note{color:#d8ccff;background:rgba(150,110,255,.1);border-color:rgba(190,160,255,.35)}
+.lfoot{position:sticky;bottom:calc(-22px - var(--safeB));z-index:2;width:calc(100% + 28px);margin:8px -14px calc(-22px - var(--safeB));
+  padding:10px 14px calc(12px + var(--safeB));background:linear-gradient(180deg,rgba(5,8,20,.85),rgba(5,8,20,.98));border-top:1px solid rgba(127,214,255,.2);
+  display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#loadoutSum{font-size:13px;color:#cfe4ff;text-align:left;flex:1 1 220px;min-width:0;line-height:1.5}
+#loadoutSum b{color:#fff}
+#loadoutSum i{font-style:normal;color:#ff9ac8}
+#loadoutSum small{font-size:11.5px;color:#8ea6c8}
+.lfoot .btn{min-height:46px}
+
+/* ================= ロビー ================= */
+.codeLabel{font-size:12px;letter-spacing:.3em;color:#8fb0d8}
+#lobbyCode{font-size:clamp(40px,13vw,78px);font-weight:900;letter-spacing:.32em;padding-left:.32em;color:var(--cyan);line-height:1.05;
+  text-shadow:0 0 26px rgba(127,214,255,.6),0 0 60px rgba(127,214,255,.25);font-variant-numeric:tabular-nums;user-select:all;-webkit-user-select:all}
+#lobbyInfo{font-size:13px;letter-spacing:.1em;color:#bcd0ea}
+#lobbyInfo b{color:#fff}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.team{border-radius:14px;padding:0 0 8px;overflow:hidden;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:7px}
+.team .th{padding:8px 10px;font-weight:800;letter-spacing:.14em;font-size:14px;color:#fff}
+.team.t0{border-color:rgba(255,77,94,.45)}.team.t0 .th{background:linear-gradient(90deg,rgba(255,77,94,.55),rgba(255,77,94,.12));text-shadow:0 0 10px #ff4d5e}
+.team.t1{border-color:rgba(61,162,255,.45)}.team.t1 .th{background:linear-gradient(90deg,rgba(61,162,255,.55),rgba(61,162,255,.12));text-shadow:0 0 10px #3da2ff}
+.team .th small{font-weight:500;font-size:11px;opacity:.8;margin-left:6px;letter-spacing:.04em}
+.slot{margin:0 8px;border-radius:10px;padding:8px 9px;text-align:left;min-height:74px;display:flex;flex-direction:column;gap:3px;justify-content:center;
+  background:rgba(8,12,28,.6);border:1px solid rgba(255,255,255,.08);font-size:13px}
+.slot.me{border-color:rgba(127,214,255,.6);box-shadow:inset 0 0 14px rgba(127,214,255,.12)}
+.slot .pn{font-weight:800;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .pn u{text-decoration:none;font-size:10.5px;color:var(--cyan);font-weight:600;margin-left:4px}
+.slot .pw{font-size:11px;color:#9fb4d4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .pr{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}
+.slot .ok{color:#6ff0b0;font-weight:700}.slot .ng{color:#7890b4}
+.slot .pp{color:#8fa8c8;font-variant-numeric:tabular-nums}
+.slot.empty{align-items:center;color:#6f86aa;border-style:dashed;border-color:rgba(160,190,230,.25);background:transparent}
+button.slot.empty{cursor:pointer;color:#9fd4ff;border-color:rgba(127,214,255,.4);width:calc(100% - 16px);font-size:13px}
+@media (hover:hover){button.slot.empty:hover{background:rgba(127,214,255,.08)}}
+/* 3対3 はスロットが多いので少し詰める */
+.team.n3{gap:6px}
+.team.n3 .slot{min-height:62px;padding:6px 9px;gap:2px}
+#btnStart{min-width:220px}
+
+/* ================= リザルト ================= */
+#resTitle{font-size:clamp(34px,11vw,64px);font-weight:900;letter-spacing:.14em;line-height:1.1;text-shadow:0 0 30px currentColor;animation:resIn .6s cubic-bezier(.2,1.4,.4,1)}
+#resTitle small{display:block;font-size:.34em;letter-spacing:.2em;margin-top:6px;color:#dfe9ff;text-shadow:none}
+@keyframes resIn{from{transform:scale(1.6);opacity:0}to{transform:scale(1);opacity:1}}
+#resScore{font-size:clamp(28px,8vw,44px);font-weight:900;letter-spacing:.12em;font-variant-numeric:tabular-nums}
+#resScore .s0{color:var(--red);text-shadow:0 0 16px rgba(255,77,94,.6)}#resScore .s1{color:var(--blue);text-shadow:0 0 16px rgba(61,162,255,.6)}
+#resScore .dash{color:#6f86aa;margin:0 .3em}
+#resTable{width:100%;border-collapse:collapse;font-size:14px}
+#resTable th{font-size:11px;letter-spacing:.12em;color:#7890b4;font-weight:600;padding:6px 8px;text-align:right}
+#resTable th:first-child,#resTable td:first-child{text-align:left}
+#resTable td{padding:9px 8px;border-top:1px solid rgba(255,255,255,.07);text-align:right;font-variant-numeric:tabular-nums}
+#resTable td:first-child{max-width:40vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#resTable tr.me td{background:rgba(127,214,255,.1);color:#fff;font-weight:700}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:0;box-shadow:0 0 8px currentColor;background:currentColor}
+.tblWrap{width:100%;overflow-x:auto;padding:6px 8px}
+
+/* ================= あそびかた ================= */
+/* ルールのカードは8枚。せまい画面は2列、ひろい画面は4列（2段でそろう） */
+.rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;width:100%}
+@media (min-width:640px){.rules{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.rule{padding:12px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);font-size:13px;line-height:1.6;color:#cfe0f6}
+.rule b{display:table;font-size:11px;font-weight:900;letter-spacing:.1em;color:#04121f;background:#7fd6ff;padding:2px 9px;border-radius:8px;margin:0 auto 6px}
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;width:100%;text-align:left}
+.ctrl{padding:12px 14px}
+.ctrl h3{margin-bottom:8px}
+.ctrl dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px;align-items:center}
+.ctrl dt{white-space:nowrap}
+.ctrl dt kbd{display:inline-block;min-width:26px;text-align:center;padding:2px 7px;border-radius:6px;font-family:inherit;font-size:12px;font-weight:700;
+  background:rgba(127,214,255,.1);border:1px solid rgba(127,214,255,.35);color:#dff0ff}
+.ctrl dd{color:#a9bddb}
+
+/* ================= せってい ================= */
+.setList{width:100%;display:flex;flex-direction:column;gap:4px;padding:10px 14px}
+.setRow{display:grid;grid-template-columns:minmax(96px,auto) 1fr 54px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}
+.setRow:last-child{border-bottom:0}
+.setRow label{font-size:14px;color:#cfe0f6;letter-spacing:.04em}
+.setRow output{font-size:14px;color:var(--cyan);text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.setRow select{grid-column:2 / 4}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:34px;background:transparent;touch-action:pan-y}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,#3da2ff,#7fd6ff);opacity:.8}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:linear-gradient(90deg,#3da2ff,#7fd6ff)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;margin-top:-10px;background:#eaf6ff;border:2px solid #7fd6ff;box-shadow:0 0 12px rgba(127,214,255,.7)}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#eaf6ff;border:2px solid #7fd6ff}
+.switch{position:relative;width:54px;height:30px;justify-self:end;grid-column:3}
+.switch input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+.switch span{position:absolute;inset:0;border-radius:15px;background:rgba(255,255,255,.12);border:1px solid rgba(160,190,230,.3);transition:.15s}
+.switch span::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#bcd0ea;transition:.15s}
+.switch input:checked + span{background:rgba(127,214,255,.4);border-color:var(--cyan)}
+.switch input:checked + span::after{left:27px;background:#fff;box-shadow:0 0 10px #7fd6ff}
+.setRow label small{display:block;font-size:11px;color:#7f96ba;letter-spacing:.02em;margin-top:1px;line-height:1.4}
+.setRow.sw label{grid-column:1 / 3}
+#btnLayout small{color:#bfe6ff}
+
+/* ================= メニュー（しあい中） ================= */
+#scMenu .panel{max-width:340px}
+#scMenu .stack{max-width:320px}
+#menuHint b{color:#ffd28a;font-weight:700}
+
+/* ================= ボタンの配置・大きさ（エディター） =================
+   画面そのものは透明で、パネルだけがさわれる。タッチボタン（#touch, z12）は
+   パネル以外の場所でドラッグできる。うしろの暗い背景は #layoutBg（z11）。 */
+#scLayout{background:none;pointer-events:none;padding:0;overflow:hidden;touch-action:none}
+#scLayout::before{display:none}
+#layoutBg{position:fixed;inset:0;z-index:11;display:none;pointer-events:none;overflow:hidden;
+  background:linear-gradient(180deg,#0a1230 0%,#152452 47%,#241a4a 50%,#0b0e22 58%,#05070f 100%)}
+#layoutBg::before{content:"";position:absolute;left:-50%;right:-50%;top:50%;bottom:-10%;opacity:.55;
+  background-image:linear-gradient(rgba(127,214,255,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(127,214,255,.16) 1px,transparent 1px);
+  background-size:48px 48px;transform:perspective(420px) rotateX(58deg);transform-origin:50% 0}
+body.layout-edit #layoutBg{display:block}
+body.layout-edit.in-match #layoutBg{background:rgba(3,5,14,.28)}
+body.layout-edit.in-match #layoutBg::before,body.layout-edit.in-match #layoutBg .lg{display:none}
+.lg{position:absolute;display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px dashed rgba(170,200,240,.32);border-radius:10px;
+  color:rgba(205,225,250,.5);font-size:12px;font-weight:700;letter-spacing:.08em;background:rgba(4,6,15,.25)}
+.lgHp{left:calc(10px + var(--safeL));top:calc(8px + var(--safeT));width:clamp(130px,26vmin,230px);height:clamp(32px,6.5vmin,46px)}
+.lgAmmo{left:calc(10px + var(--safeL));top:calc(8px + var(--safeT) + clamp(44px,8vmin,62px));width:clamp(84px,15vmin,120px);height:clamp(30px,6vmin,44px)}
+.lgScore{left:50%;top:calc(8px + var(--safeT));transform:translateX(-50%);width:clamp(150px,30vmin,230px);height:clamp(32px,6vmin,46px)}
+.lgCross{left:50%;top:50%;width:28px;height:28px;margin:-14px 0 0 -14px;border:0;background:none}
+.lgCross::before,.lgCross::after{content:"";position:absolute;background:rgba(255,255,255,.6);border-radius:1px}
+.lgCross::before{left:13px;top:0;width:2px;height:28px}
+.lgCross::after{top:13px;left:0;height:2px;width:28px}
+.layPanel{position:absolute;pointer-events:auto;touch-action:manipulation;z-index:1;
+  left:calc(12px + var(--safeL));top:calc(8px + var(--safeT));width:min(390px,calc(100vw - 24px - var(--safeL) - var(--safeR)));
+  display:flex;flex-direction:column;gap:7px;padding:6px 12px 12px;text-align:left;border-radius:16px;
+  background:linear-gradient(180deg,rgba(20,32,70,.95),rgba(8,12,30,.95));border:1px solid rgba(127,214,255,.35);
+  box-shadow:0 12px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
+/* ひろい画面ではまんなかに。スコアの目安（lgScore）にかぶらないよう少し下げる */
+@media (min-width:1000px){.layPanel{left:50%;transform:translateX(-50%);top:calc(14px + var(--safeT) + clamp(36px,6vmin,52px))}}
+.layPanel.moved{transform:none}
+.layHead{display:flex;align-items:center;gap:8px;min-height:36px;cursor:move;touch-action:none}
+.layHead b{flex:1;min-width:0;font-size:14.5px;font-weight:800;letter-spacing:.1em;color:#dff0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.layGrip{flex:none;width:14px;height:18px;opacity:.6;background-image:radial-gradient(circle,#9fc4ee 1.3px,transparent 1.6px);background-size:7px 6px}
+.layFold{flex:none;font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.06em;color:#bcd0ea;cursor:pointer;min-height:32px;padding:4px 12px;
+  border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(160,190,230,.3)}
+.layBody{display:flex;flex-direction:column;gap:5px}
+.layTip{font-size:11.5px;line-height:1.55;color:#a9bddb;letter-spacing:.02em}
+.layTip b{color:#dff0ff;font-weight:700}
+.layPortrait{display:none;font-size:12px;font-weight:700;color:#ffd28a;letter-spacing:.04em}
+@media (orientation:portrait) and (max-width:599.98px){body.touch .layPortrait{display:block}}
+.layRow{display:grid;grid-template-columns:minmax(88px,auto) 1fr 46px;gap:8px;align-items:center}
+.layRow label{font-size:13px;color:#cfe0f6;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.layRow label.on{color:var(--cyan);font-weight:800}
+.layRow output{font-size:13px;color:var(--cyan);text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.layRow input[type=range]{height:32px}
+.layRow input[type=range]:disabled{opacity:.3}
+.layBtns{display:flex;gap:8px}
+.layBtns .btn{flex:1;min-width:0;min-height:42px;padding:8px 4px;font-size:14px;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.layBtns #btnLayoutReset{flex:1.25}
+.layPanel.folded .layBody{display:none}
+.layPanel.folded{padding-bottom:6px}
+.layPanel.dragging{opacity:.92;box-shadow:0 16px 50px rgba(0,0,0,.6),0 0 0 1px rgba(127,214,255,.6)}
+@media (max-width:380px){.layBtns .btn{font-size:13px;letter-spacing:.02em}.layRow{grid-template-columns:minmax(80px,auto) 1fr 44px}}
+@media (max-height:430px){
+  .layPanel{gap:5px;padding:4px 10px 9px}
+  .layHead{min-height:32px}
+  .layTip{font-size:11px;line-height:1.45}
+  .layRow input[type=range]{height:28px}
+  .layBtns .btn{min-height:38px;font-size:13.5px}
+}
+
+/* ================= 縦向き案内 ================= */
+#rotate{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:#04060f;color:#dff0ff;font-size:20px;font-weight:800;letter-spacing:.12em;text-align:center;padding:20px}
+#rotate .ic{font-size:56px;animation:rot 1.8s ease-in-out infinite}
+@keyframes rot{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait) and (max-width:599.98px){body.touch.in-match #rotate{display:flex}}
+
+/* ================= トースト ================= */
+#toast{position:fixed;left:50%;top:calc(16px + var(--safeT));z-index:60;transform:translate(-50%,-20px);opacity:0;pointer-events:none;
+  padding:10px 18px;border-radius:22px;background:rgba(10,18,40,.94);border:1px solid rgba(127,214,255,.45);color:#eaf6ff;font-size:14px;
+  letter-spacing:.06em;box-shadow:0 8px 30px rgba(0,0,0,.4);transition:opacity .2s,transform .2s;max-width:88vw;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ================= HUD ================= */
+#touch{position:fixed;inset:0;z-index:12;touch-action:none}
+body.pc #touch{pointer-events:none}
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none;display:none;touch-action:none;overflow:hidden;
+  font-size:clamp(12px,2.1vmin,17px);color:#eaf4ff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+#hud.on{display:block}
+#hud .hide{display:none!important}
+#vignette{position:absolute;inset:0;opacity:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(255,20,50,.55) 100%);will-change:opacity}
+#tags{position:absolute;inset:0}
+.ntag{position:absolute;left:0;top:0;white-space:nowrap;font-size:clamp(12px,1.9vmin,15px);font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:8px;
+  background:rgba(4,6,15,.45);will-change:transform;transform-origin:50% 100%}
+.ntag.t0{color:#ff8a95;border-bottom:2px solid #ff4d5e}.ntag.t1{color:#8cc8ff;border-bottom:2px solid #3da2ff}
+#dmgDirs{position:absolute;left:50%;top:50%;width:0;height:0}
+.darc{position:absolute;left:calc(min(46vmin,300px) * -1);top:calc(min(46vmin,300px) * -1);width:min(92vmin,600px);height:min(92vmin,600px);opacity:0;will-change:transform,opacity}
+.darc::before{content:"";position:absolute;left:50%;top:0;width:34%;height:34%;transform:translateX(-50%);border-radius:50%;
+  border-top:6px solid rgba(255,60,80,.95);filter:drop-shadow(0 0 6px rgba(255,40,60,.9))}
+.darc.on{animation:darcFade 1.15s ease-out forwards}
+@keyframes darcFade{0%{opacity:0}10%{opacity:1}55%{opacity:.85}100%{opacity:0}}
+/* 照準 */
+#crosshair{position:absolute;left:50%;top:50%;width:0;height:0}
+#crosshair i{position:absolute;background:#fff;box-shadow:0 0 2px rgba(0,0,0,.9);will-change:transform}
+#crosshair .ct,#crosshair .cb{left:-1px;width:2px;height:9px}
+#crosshair .cl,#crosshair .cr{top:-1px;width:9px;height:2px}
+#crosshair .ct{top:-9px}#crosshair .cb{top:0}#crosshair .cl{left:-9px}#crosshair .cr{left:0}
+#crosshair .cd{left:-1.5px;top:-1.5px;width:3px;height:3px;border-radius:50%;background:#7fd6ff}
+#hud.scoped #crosshair{display:none}
+#charge{position:absolute;left:-26px;top:22px;width:52px;height:5px;border-radius:3px;background:rgba(0,0,0,.45);overflow:hidden;display:none}
+#charge.on{display:block}
+#charge b{position:absolute;inset:0;background:linear-gradient(90deg,#3da2ff,#bff0ff);transform-origin:0 50%;transform:scaleX(0)}
+#charge.full b{background:#fff;box-shadow:0 0 10px #7fd6ff}
+/* 1発ごとに待つ銃（スナイパーなど）: 次に撃てるまでのバー。まんなかの少し上（スコープ中も見える） */
+#shotWait{position:absolute;left:50%;top:calc(50% - 54px);width:124px;height:10px;margin-left:-62px;border-radius:6px;background:rgba(0,0,0,.55);
+  border:1px solid rgba(255,255,255,.35);display:none;pointer-events:none}
+#shotWait.on{display:block}
+#shotWait b{position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:4px;background:linear-gradient(90deg,#ff7a3d,#ffd23d);transform-origin:0 50%;transform:scaleX(0)}
+#shotWait.rel b{background:linear-gradient(90deg,#3da2ff,#7fd6ff)}
+#shotWait.ok{border-color:#8ff0a4}
+#shotWait.ok b{background:#8ff0a4;box-shadow:0 0 12px #8ff0a4}
+#shotWait span{position:absolute;left:50%;bottom:11px;transform:translateX(-50%);font-size:11px;font-weight:900;letter-spacing:.08em;color:#fff;text-shadow:0 1px 3px #000;white-space:nowrap}
+#shotWait.ok span{color:#8ff0a4;font-size:12px}
+#hitmark{position:absolute;left:50%;top:50%;width:0;height:0;opacity:0}
+#hitmark i{position:absolute;left:-1.5px;top:-17px;width:3px;height:10px;background:#fff;border-radius:1px;box-shadow:0 0 4px rgba(0,0,0,.6);transform-origin:1.5px 17px}
+#hitmark i:nth-child(1){transform:rotate(45deg)}#hitmark i:nth-child(2){transform:rotate(135deg)}#hitmark i:nth-child(3){transform:rotate(225deg)}#hitmark i:nth-child(4){transform:rotate(315deg)}
+#hitmark.hs i{background:#ff5a5a;box-shadow:0 0 6px rgba(255,60,60,.9)}
+#hitmark.kill i{height:14px;top:-22px;transform-origin:1.5px 22px;width:4px}
+#hitmark.on{animation:hmPop .4s ease-out forwards}
+#hitmark.kill.on{animation-duration:.6s}
+@keyframes hmPop{0%{opacity:1;transform:scale(.7)}55%{opacity:1;transform:scale(1.04)}100%{opacity:0;transform:scale(1.4)}}
+/* 上部 */
+#teamScore{position:absolute;left:50%;top:calc(8px + var(--safeT));transform:translateX(-50%);display:flex;align-items:center;gap:10px}
+.sc{min-width:2.4em;text-align:center;font-size:clamp(20px,4.4vmin,34px);font-weight:900;padding:1px 10px;border-radius:10px;font-variant-numeric:tabular-nums;border:1px solid transparent}
+#score0{color:#fff;background:linear-gradient(180deg,rgba(255,77,94,.85),rgba(160,20,40,.75));box-shadow:0 0 16px rgba(255,77,94,.45)}
+#score1{color:#fff;background:linear-gradient(180deg,rgba(61,162,255,.85),rgba(20,70,160,.75));box-shadow:0 0 16px rgba(61,162,255,.45)}
+.sc.mine{border-color:#fff}
+.scMid{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:5.6em}
+#timer{font-size:clamp(14px,2.8vmin,22px);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.06em}
+#timer.warn{color:#ffb86b}
+#toWin{font-size:clamp(12px,1.7vmin,13px);color:#bcd0ea;white-space:nowrap}
+#ping{position:absolute;left:calc(10px + var(--safeL));top:calc(8px + var(--safeT));font-size:12px;font-variant-numeric:tabular-nums;color:#8fe8b4;background:rgba(4,6,15,.4);padding:2px 8px;border-radius:10px}
+#ping.mid{color:#ffd28a}#ping.bad{color:#ff8a95}
+#netWarn{position:absolute;left:50%;top:calc(var(--safeT) + clamp(64px,11vmin,90px));transform:translateX(-50%);display:none;font-size:13px;font-weight:700;
+  color:#ffd28a;background:rgba(40,20,0,.6);border:1px solid rgba(255,190,90,.5);padding:4px 12px;border-radius:14px;animation:blink 1s ease-in-out infinite}
+#netWarn.on{display:block}
+@keyframes blink{50%{opacity:.55}}
+#killfeed{position:absolute;right:calc(10px + var(--safeR));top:calc(10px + var(--safeT));display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:46vw}
+body.touch #killfeed{top:calc(var(--safeT) + clamp(56px,11vmin,84px))}
+.kf{display:flex;align-items:center;gap:6px;font-size:clamp(12px,1.9vmin,15px);padding:3px 10px;border-radius:9px;background:rgba(4,6,15,.55);border:1px solid rgba(255,255,255,.08);
+  white-space:nowrap;transition:opacity .5s,transform .5s;animation:kfIn .22s ease-out}
+.kf.me{border-color:rgba(127,214,255,.55);background:rgba(20,40,70,.6)}
+.kf.fade{opacity:0;transform:translateX(12px)}
+.kf .k0{color:#ff8a95;font-weight:700}.kf .k1{color:#8cc8ff;font-weight:700}
+.kf .kw{font-size:.86em;color:#cfe0f6;padding:0 5px;border-radius:5px;background:rgba(255,255,255,.08)}
+.kf .kn{max-width:9em;overflow:hidden;text-overflow:ellipsis}
+@keyframes kfIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+/* 下部 */
+#hpBox{position:absolute;left:calc(14px + var(--safeL));bottom:calc(14px + var(--safeB));display:flex;align-items:center;gap:10px;
+  padding:8px 12px;border-radius:12px;background:rgba(4,6,15,.5);border:1px solid rgba(255,255,255,.1);border-left:3px solid var(--team)}
+#hpNum{font-size:clamp(22px,4.4vmin,36px);font-weight:900;min-width:2.1em;text-align:right;font-variant-numeric:tabular-nums;line-height:1}
+.hpTrack{width:clamp(110px,24vmin,220px);height:clamp(8px,1.4vmin,12px);border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden;position:relative}
+#hpBar{position:absolute;inset:0;background:linear-gradient(90deg,#39d98a,#8ff0c0);transform-origin:0 50%;will-change:transform;transition:transform .12s}
+#hpBox.low #hpBar{background:linear-gradient(90deg,#ff3050,#ff8a6b)}
+#hpBox.low #hpNum{color:#ff8a95}
+#ammoBox{position:absolute;right:calc(14px + var(--safeR));bottom:calc(14px + var(--safeB));text-align:right;padding:8px 14px;border-radius:12px;
+  background:rgba(4,6,15,.5);border:1px solid rgba(255,255,255,.1);min-width:7.5em}
+#ammoNum{font-size:clamp(26px,5vmin,42px);font-weight:900;font-variant-numeric:tabular-nums;line-height:1}
+#ammoMag{font-size:clamp(13px,2.2vmin,18px);color:#8fa8c8;margin-left:4px;font-variant-numeric:tabular-nums}
+#ammoBox.empty #ammoNum{color:#ff8a95}
+/* v5: いまの銃 と もう1つの銃（もちかえ） */
+#gunLine{font-size:11.5px;color:#cfe4ff;margin-top:3px;white-space:nowrap}#gunLine b{color:#fff}#gunLine small{color:#9fb4d4;font-size:10.5px}#gunLine:empty{display:none}
+.rTrack{height:4px;margin-top:6px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden;visibility:hidden}
+.rTrack.on{visibility:visible}
+#reloadBar{height:100%;background:#ffd28a;transform-origin:0 50%;transform:scaleX(0);will-change:transform}
+#reloadTxt{font-size:12px;color:#ffd28a;letter-spacing:.1em;height:0;overflow:visible;position:relative;top:-3.2em;visibility:hidden}
+.rTrack.on + #reloadTxt{visibility:visible}
+#bombBox{position:absolute;right:calc(14px + var(--safeR));bottom:calc(14px + var(--safeB) + clamp(78px,12vmin,100px));padding:7px 12px;border-radius:12px;
+  background:rgba(4,6,15,.5);border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:7.5em}
+#bombName{font-size:13px;font-weight:700;color:#ffb9d9}
+#bombPips{display:flex;gap:4px}
+#bombPips i{width:12px;height:12px;border-radius:3px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2)}
+#bombPips i.on{background:#ff5ea8;border-color:#ffb9d9;box-shadow:0 0 8px rgba(255,94,168,.8)}
+.bTrack{width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden;visibility:hidden}
+.bTrack.on{visibility:visible}
+#bombCdBar{height:100%;background:#ff9ac8;transform-origin:0 50%;transform:scaleX(0);will-change:transform}
+body.touch #bombBox{display:none}
+#bjLine{font-size:11.5px;font-weight:700;color:#9fb4d4;white-space:nowrap}#bjLine.ok{color:#8ff0a4}#bjLine:empty{display:none}
+/* スマホ：体力と弾は上の左側へ（下はスティックとボタンの場所） */
+body.touch #hpBox{bottom:auto;top:calc(8px + var(--safeT));left:calc(10px + var(--safeL));padding:5px 10px;gap:8px}
+body.touch .hpTrack{width:clamp(80px,18vmin,170px)}
+body.touch #ammoBox{bottom:auto;right:auto;top:calc(8px + var(--safeT) + clamp(44px,8vmin,62px));left:calc(10px + var(--safeL));text-align:left;padding:4px 10px;min-width:0}
+body.touch #ping{top:auto;bottom:calc(6px + var(--safeB));left:50%;transform:translateX(-50%)}
+body.touch #reloadTxt{top:0;height:auto}
+/* 中央 */
+#centerMsg{position:absolute;left:0;right:0;top:27%;text-align:center;font-size:clamp(28px,8vmin,64px);font-weight:900;letter-spacing:.1em;opacity:0;
+  text-shadow:0 0 24px currentColor,0 2px 6px rgba(0,0,0,.6);transition:opacity .35s;padding:0 10px}
+#centerMsg.on{opacity:1}
+#centerMsg.pop{animation:cPop .45s cubic-bezier(.2,1.5,.4,1)}
+@keyframes cPop{from{transform:scale(1.8);opacity:0}to{transform:scale(1);opacity:1}}
+#protect{position:absolute;left:50%;top:calc(50% + clamp(34px,7vmin,54px));transform:translateX(-50%);display:none;font-size:13px;font-weight:800;letter-spacing:.2em;
+  color:#bff0ff;padding:3px 12px;border-radius:12px;background:rgba(60,160,255,.25);border:1px solid rgba(127,214,255,.6);box-shadow:0 0 14px rgba(127,214,255,.4)}
+#protect.on{display:block}
+/* v5: よわよわボムを あびた（こうげき力ダウン） */
+#weakTag{position:absolute;left:50%;top:calc(50% + clamp(62px,11vmin,84px));transform:translateX(-50%);display:none;font-size:12.5px;font-weight:800;letter-spacing:.12em;
+  color:#f0e0ff;padding:3px 12px;border-radius:12px;background:rgba(150,80,255,.3);border:1px solid rgba(200,160,255,.7);white-space:nowrap}
+#weakTag.on{display:block}
+#scope.on{display:block}
+#scope{position:absolute;inset:0;display:none;
+  background:radial-gradient(circle at 50% 50%,transparent 0,transparent 36vmin,rgba(127,214,255,.35) 36.2vmin,rgba(0,0,0,.96) 36.8vmin)}
+#scope::before,#scope::after{content:"";position:absolute;background:rgba(0,0,0,.85)}
+#scope::before{left:50%;top:14vh;bottom:14vh;width:2px;margin-left:-1px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.9) 12%,rgba(0,0,0,.9) 46%,transparent 48%,transparent 52%,rgba(0,0,0,.9) 54%,rgba(0,0,0,.9) 88%,transparent)}
+#scope::after{top:50%;left:calc(50% - 36vmin);right:calc(50% - 36vmin);height:2px;margin-top:-1px;background:linear-gradient(90deg,transparent,rgba(0,0,0,.9) 12%,rgba(0,0,0,.9) 46%,transparent 48%,transparent 52%,rgba(0,0,0,.9) 54%,rgba(0,0,0,.9) 88%,transparent)}
+#scope i{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#ff4d5e;box-shadow:0 0 6px #ff4d5e}
+#respawn{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:radial-gradient(ellipse at center,rgba(40,0,10,.35),rgba(10,0,6,.7))}
+#respawn.on{display:flex}
+#respawnNum{font-size:clamp(64px,20vmin,150px);font-weight:900;line-height:1;color:#fff;text-shadow:0 0 30px rgba(255,77,94,.8);font-variant-numeric:tabular-nums}
+#respawnBy{font-size:clamp(15px,3vmin,22px);font-weight:700;letter-spacing:.08em;color:#ffc2c8}
+#respawnBy b{color:#fff}
+.respawnSub{font-size:13px;color:#bcd0ea;letter-spacing:.2em}
+#board{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;width:min(94vw,640px);max-height:84vh;overflow:hidden;
+  padding:12px 14px;border-radius:16px;background:rgba(5,9,22,.88);border:1px solid rgba(127,214,255,.25);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+#board.on{display:block}
+.bGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bTeam h4{font-size:14px;letter-spacing:.12em;padding:5px 8px;border-radius:8px;margin-bottom:4px;display:flex;justify-content:space-between}
+.bTeam.t0 h4{background:rgba(255,77,94,.35)}.bTeam.t1 h4{background:rgba(61,162,255,.35)}
+.bTeam table{width:100%;border-collapse:collapse;font-size:clamp(12px,1.9vmin,14px)}
+.bTeam th{font-size:11px;color:#7f96ba;font-weight:600;text-align:right;padding:2px 4px}
+.bTeam td{padding:5px 4px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid rgba(255,255,255,.06)}
+.bTeam th:first-child,.bTeam td:first-child{text-align:left}
+.bTeam td:first-child{max-width:8em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bTeam tr.me td{color:#bff0ff;font-weight:800}
+.bTeam tr.dead td{opacity:.5}
+#clickToPlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;background:rgba(3,5,14,.35)}
+#clickToPlay.on{display:flex}
+#clickToPlay span{font-size:clamp(20px,4vmin,30px);font-weight:800;letter-spacing:.2em;padding:16px 30px;border-radius:16px;
+  background:rgba(10,18,40,.85);border:1px solid rgba(127,214,255,.55);box-shadow:0 0 30px rgba(127,214,255,.35);animation:blink 1.6s ease-in-out infinite}
+#clickToPlay small{display:block;font-size:12px;letter-spacing:.1em;color:#9fb4d4;margin-top:6px;font-weight:500;text-align:center}
+body.touch #clickToPlay{display:none!important}
+/* やられている間は「クリックでプレイ」を下に小さく出す（ふっかつのカウントダウンを かくさない） */
+#hud.dead #clickToPlay{align-items:flex-end;padding-bottom:calc(12vh + var(--safeB));background:none}
+#hud.dead #clickToPlay span{font-size:clamp(14px,2.4vmin,18px);padding:9px 18px;letter-spacing:.14em}
+/* ためし撃ち（しあいではない） */
+#practiceSign{position:absolute;left:50%;top:calc(8px + var(--safeT));transform:translateX(-50%);display:none;text-align:center;
+  font-size:13px;font-weight:800;letter-spacing:.18em;color:#ffd28a;background:rgba(40,26,0,.5);border:1px solid rgba(255,190,90,.4);
+  padding:3px 14px;border-radius:14px;white-space:nowrap}
+#practiceSign small{display:block;font-size:10.5px;font-weight:500;letter-spacing:.06em;color:#cbb08a}
+body.practice #practiceSign{display:block}
+body.practice #teamScore,body.practice #ping,body.practice #netWarn,body.practice #killfeed{display:none}
+/* コンピューター対戦（オフライン）: 通信の表示はいらない */
+body.offline #ping,body.offline #netWarn{display:none}
+
+@media (max-width:420px){
+  .btn{font-size:15px;padding:11px 16px}
+  .cgrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:7px}
+  .wcard{padding:8px 8px 10px}
+  .wcard .wd{font-size:11px}
+  .stats{gap:2px 5px}
+  .stats em{font-size:10px}
+  .teams{gap:7px}
+  .slot{margin:0 6px;padding:7px}
+}
+@media (max-height:440px) and (orientation:landscape){
+  .screen{padding-top:calc(10px + var(--safeT))}
+  .logo{font-size:clamp(34px,9vw,60px)}
+  #scTitle .panel{gap:9px}
+  .floor{display:none}
+}
+/* スマホよこ向き: タイトルは 左にロゴ・右にボタンの2列（スクロールしなくても全部見える） */
+@media (max-height:500px) and (orientation:landscape) and (min-width:600px){
+  #scTitle{padding-bottom:calc(10px + var(--safeB))}
+  #scTitle .panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,330px);column-gap:clamp(14px,3.6vw,40px);row-gap:6px;
+    align-items:center;justify-items:center;align-content:center;max-width:880px;padding-bottom:0}
+  #scTitle .panel>*{grid-column:1}
+  #scTitle .panel>.stack{grid-column:2;grid-row:1 / span 5;align-self:center;gap:7px;max-width:none}
+  #scTitle .logo{font-size:clamp(26px,5.2vw,50px);margin-top:0}
+  #scTitle .kana{font-size:11px;letter-spacing:.5em}
+  #scTitle .titleLead{font-size:13px;line-height:1.7;margin:0}
+  #scTitle .nameRow{max-width:300px}
+  #scTitle .btn{min-height:42px;padding-top:7px;padding-bottom:7px}
+  #scTitle .btn.big{min-height:46px;font-size:16.5px}
+  #scTitle .btn.ghost{min-height:38px}
+  #scTitle .btn small{margin-top:1px}
+  #scTitle .titleFoot{margin-top:0;gap:10px}
+}
+
+/* ================= v3: タイトルのならび ================= */
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:100%}
+.row2 .btn,.row3 .btn{min-width:0;padding-left:8px;padding-right:8px}
+.row3 .btn{font-size:13px;letter-spacing:.04em}
+#btnTower{background:linear-gradient(180deg,rgba(255,190,60,.5),rgba(120,70,10,.66));border-color:rgba(255,210,120,.6)}
+#btnTower small{color:#ffe2a8}
+#btnSkin small,#btnMaps small,#btnFriends small{color:#bfe6ff}
+.badge{position:absolute;top:-7px;right:-7px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#ff4d5e;color:#fff;
+  font-size:12px;font-weight:900;line-height:22px;letter-spacing:0;box-shadow:0 0 10px rgba(255,77,94,.7)}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:12.5px;letter-spacing:.04em}
+.btn.warn{border-color:#ff8a95;color:#ffb3c0}
+.row4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%}
+.row4 .btn{min-width:0;min-height:44px;padding:6px 3px;font-size:12.5px;letter-spacing:0;line-height:1.3}
+#btnStages{background:linear-gradient(180deg,rgba(40,200,165,.5),rgba(6,78,66,.66));border-color:rgba(110,240,205,.6)}
+@media (hover:hover){#btnStages:hover{background:linear-gradient(180deg,rgba(70,225,190,.7),rgba(10,100,85,.8));box-shadow:0 0 24px rgba(80,230,190,.4)}}
+#btnStages small{color:#c4f7ea}
+#btnStages,#btnMaps{font-size:15px;letter-spacing:.02em;white-space:nowrap}
+
+/* ================= みんなのステージ ================= */
+.stTools{display:flex;gap:8px;width:100%;max-width:560px}
+.stTools input[type=text]{max-width:none;flex:1;min-width:0;font-size:15px;letter-spacing:.02em;text-align:left;min-height:42px;padding:8px 12px}
+.stTools .btn{flex:none}
+.stTabs{max-width:560px}
+.stTabs .btn{min-height:38px;font-size:13px;letter-spacing:.02em}
+.stGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;width:100%}
+.stCard{position:relative;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;text-align:left;font-family:inherit;color:#eaf4ff;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);transition:border-color .14s,box-shadow .14s}
+@media (hover:hover){.stCard:hover{border-color:rgba(110,240,205,.55);box-shadow:0 0 16px rgba(80,230,190,.2)}}
+.stCard .mthumb{width:58px;height:58px}
+.stInfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.stInfo b{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px}
+.stInfo small{font-size:11.5px;color:#9fb4d4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stInfo small.stMeta{color:#6f86aa;font-size:10.5px}
+.stBadge{position:absolute;top:6px;right:8px;font-style:normal;font-size:10.5px;font-weight:800;color:#ffd28a}
+.stBadge.mine{color:#6ff0b0}
+.stEmpty{grid-column:1/-1;padding:12px 4px}
+.stDetail{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+  padding:calc(12px + var(--safeT)) calc(12px + var(--safeR)) calc(12px + var(--safeB)) calc(12px + var(--safeL));background:rgba(3,5,14,.72)}
+.stDetail.on{display:flex}
+.stBox{width:min(100%,470px);max-height:100%;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:rgba(12,20,46,.97)}
+.stHead{display:flex;gap:12px;align-items:center;text-align:left}
+.stHead .mthumb{width:96px;height:96px}
+.stHeadInfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.stHeadInfo b{font-size:18px;word-break:break-all}
+.stHeadInfo small{font-size:12px;color:#9fb4d4}
+.stHeadInfo small.stId{font-size:10.5px;color:#6f86aa;word-break:break-all}
+.stPlay{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stPlay .btn{min-width:0;padding:10px 6px;font-size:14px;letter-spacing:.04em}
+.stMore{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.mmInfo small.mmPub{color:#6ff0b0;font-weight:700}
+.btn.pubBtn{border-color:rgba(110,240,205,.6);background:linear-gradient(180deg,rgba(40,200,165,.4),rgba(6,78,66,.55))}
+.mapCard.pub .thumb em{color:#8ff0d8}
+/* たしかめ（公開する など） */
+.csConfirm{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(3,5,14,.72)}
+.csConfirm.on{display:flex}
+.cfBox{width:min(92vw,440px);padding:16px;display:flex;flex-direction:column;gap:10px;text-align:center;background:rgba(12,20,46,.97)}
+#cfTitle{font-size:18px;letter-spacing:.06em}
+#cfText{font-size:13.5px;line-height:1.8;color:#cfe0f7;text-align:left}
+
+/* ================= ルールのカード ================= */
+.ruleGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%}
+@media (max-width:620px){.ruleGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ruleCard{cursor:pointer;font-family:inherit;color:#eaf4ff;text-align:left;padding:9px 10px;border-radius:12px;min-height:62px;display:flex;flex-direction:column;gap:3px;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);transition:border-color .14s,box-shadow .14s}
+.ruleCard b{display:flex;gap:6px;align-items:center;font-size:14.5px;font-weight:800;letter-spacing:.04em}
+.ruleCard b i{font-style:normal}
+.ruleCard small{font-size:11px;line-height:1.45;color:#a9bddb}
+.ruleCard.sel{border-color:#ffd28a;box-shadow:0 0 0 2px rgba(255,210,138,.45),0 0 18px rgba(255,210,138,.25);background:linear-gradient(180deg,rgba(255,190,90,.2),rgba(80,50,10,.25))}
+.ruleCard.sel b span::after{content:" ✓";color:#ffd28a}
+.ruleN{max-width:460px}
+.ruleN .btn{min-height:40px;font-size:14px}
+.ruleTag{color:#ffd28a;font-weight:700}
+.lrp{display:none;width:100%;padding:12px;flex-direction:column;gap:8px;text-align:left}
+.lrp.on{display:flex}
+.lrp select{width:100%}
+.lrp .row .btn{min-height:42px}
+
+/* ================= フレンド ================= */
+.fchip{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:10px;
+  border:1px solid rgba(160,190,230,.35);color:#9fb4d4;background:rgba(255,255,255,.04);vertical-align:1px;white-space:nowrap;font-family:inherit}
+.fchip.on{color:#6ff0b0;border-color:rgba(111,240,176,.5)}
+button.fchip{cursor:pointer;color:#bff0ff;border-color:rgba(127,214,255,.55);background:rgba(127,214,255,.12)}
+.slot .fchip{align-self:flex-start;margin:1px 0 0}
+.frMe{width:100%;padding:12px 14px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.frCode{font-size:clamp(28px,8vw,44px);font-weight:900;letter-spacing:.2em;padding-left:.2em;color:#ffd28a;text-shadow:0 0 22px rgba(255,210,138,.45);
+  user-select:all;-webkit-user-select:all;font-variant-numeric:tabular-nums}
+#frNet{min-height:18px}
+#frNet.warn{color:#ffb3c0}
+.frAdd{width:100%;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.frAddRow{display:flex;gap:8px;width:100%}
+.frAddRow input{max-width:none;flex:1;font-size:20px;letter-spacing:.18em;text-transform:uppercase}
+.frBox{width:100%;padding:10px 12px;display:flex;flex-direction:column;gap:6px;text-align:left}
+.frBox.hot{border-color:rgba(255,210,138,.5);box-shadow:0 0 18px rgba(255,210,138,.15)}
+.frList{width:100%;display:flex;flex-direction:column;gap:6px}
+.frRow{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:12px;background:rgba(8,12,28,.55);border:1px solid rgba(255,255,255,.08);text-align:left}
+.frFriend{cursor:pointer}
+@media (hover:hover){.frFriend:hover{border-color:rgba(127,214,255,.4)}}
+.frRow .btn{flex:none}
+.frDot{flex:none;width:11px;height:11px;border-radius:50%;background:#56627a}
+.frRow.on .frDot{background:#6ff0b0;box-shadow:0 0 8px #6ff0b0}
+.frWho{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.frWho b{font-size:14.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frWho small{font-size:11.5px;color:#9fb4d4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frRow.on .frWho small{color:#8ff0c8}
+.frEmpty{padding:8px 4px;text-align:left}
+#scChat .panel{max-width:620px;height:100%;margin:0 auto;gap:8px;justify-content:flex-start}
+.chatHead{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px}
+.chatHead .btn{min-height:40px;padding:6px 12px;font-size:14px}
+.chatWho{flex:1;min-width:0;display:flex;flex-direction:column;text-align:left}
+.chatWho b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chatWho small{font-size:11.5px;color:#9fb4d4}
+.chatWho small.on{color:#8ff0c8}
+.chatLog{flex:1;min-height:180px;width:100%;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch}
+.bub{max-width:78%;padding:7px 11px;border-radius:14px;font-size:14.5px;line-height:1.5;text-align:left;word-break:break-word;display:flex;flex-direction:column;gap:2px}
+.bub small{font-size:10px;opacity:.7}
+.bub.me{align-self:flex-end;background:linear-gradient(180deg,rgba(60,140,255,.55),rgba(30,70,160,.6));border-bottom-right-radius:4px}
+.bub.them{align-self:flex-start;background:rgba(255,255,255,.1);border-bottom-left-radius:4px}
+.bub.me small{text-align:right}
+.chatEmpty{margin:auto}
+.chatQuick{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;width:100%}
+.qchip{cursor:pointer;font-family:inherit;font-size:12.5px;color:#dff0ff;padding:6px 11px;border-radius:14px;background:rgba(127,214,255,.1);border:1px solid rgba(127,214,255,.35)}
+.chatIn{display:flex;gap:8px;width:100%}
+.chatIn input{max-width:none;flex:1;font-size:16px;letter-spacing:.02em;text-align:left}
+.chatFoot{width:100%;display:flex;justify-content:center}
+.frPop{position:fixed;left:50%;bottom:calc(16px + var(--safeB));z-index:65;transform:translate(-50%,140%);width:min(92vw,440px);padding:12px 14px;border-radius:16px;
+  background:rgba(12,20,46,.97);border:1px solid rgba(255,210,138,.6);box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 24px rgba(255,210,138,.2);
+  display:flex;flex-direction:column;gap:10px;transition:transform .25s cubic-bezier(.2,1.2,.4,1);text-align:center}
+.frPop.on{transform:translate(-50%,0)}
+.fpText{font-size:15px;font-weight:700;line-height:1.5}
+.fpBtns{display:flex;gap:10px;justify-content:center}
+.fpBtns .btn{flex:1;min-height:44px}
+.lInv{display:none;width:100%;padding:10px 12px;flex-direction:column;gap:6px;text-align:left}
+.lInv.on{display:flex}
+
+/* ================= 塔のぼり ================= */
+.twKinds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%}
+@media (max-width:620px){.twKinds{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.twKind{padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);text-align:left;display:flex;flex-direction:column;gap:3px}
+.twKind b{font-size:14px}
+.twKind small{font-size:11px;color:#a9bddb;line-height:1.45}
+#twDiff .btn b{display:block;font-size:17px}
+.twHead{display:flex;align-items:baseline;justify-content:center;gap:14px;flex-wrap:wrap}
+.twHead b{font-size:clamp(24px,6vw,36px);font-weight:900;color:#ffd23d;text-shadow:0 0 22px rgba(255,210,60,.5);letter-spacing:.08em}
+.twHead span{font-size:14px;color:#bcd0ea}
+.tpCards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;width:100%}
+@media (max-width:640px){.tpCards{grid-template-columns:1fr}}
+.tpCard{cursor:pointer;font-family:inherit;color:#eaf4ff;text-align:center;padding:12px 10px 14px;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:linear-gradient(180deg,rgba(40,60,120,.35),rgba(10,16,36,.5));border:1px solid rgba(127,214,255,.3);transition:transform .12s,box-shadow .14s,border-color .14s}
+@media (hover:hover){.tpCard:hover{transform:translateY(-2px);border-color:#7fd6ff;box-shadow:0 0 24px rgba(127,214,255,.35)}}
+.tpCard.s2{border-color:rgba(255,210,138,.45)}
+.tpCard.s3{border-color:rgba(255,120,150,.6);background:linear-gradient(180deg,rgba(120,30,60,.35),rgba(20,10,30,.55))}
+.tpCard.boss{border-color:rgba(200,140,255,.6)}
+.tpCard.picked{border-color:#ffe066;box-shadow:0 0 0 3px rgba(255,224,102,.55),0 0 24px rgba(255,210,61,.35)}
+.tpCard.dim{opacity:.45}
+.tpCard:disabled{cursor:default}
+#tpWait{font-size:14px;font-weight:700;color:#ffe9a8}
+.tpDoor{display:flex;align-items:baseline;gap:8px;justify-content:center;flex-wrap:wrap}
+.tpDoor b{font-size:22px;font-weight:900}
+.tpDoor span{font-size:15px;font-weight:800}
+.tpDoor em{font-style:normal;color:#ffd28a;letter-spacing:.1em}
+.tpKind{font-size:11.5px;color:#a9bddb}
+.tpChip{display:flex;align-items:center;gap:8px;justify-content:center;padding:8px 14px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);margin-top:4px}
+.tpChip i{font-style:normal;font-size:30px}
+.tpChip b{font-size:17px;font-weight:800}
+.tpChip em{font-style:normal;font-weight:900;color:#ff9ac8;font-size:16px}
+.tpDesc{font-size:12.5px;color:#dff0ff}
+.tpChips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%}
+.tchip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 9px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14)}
+.tchip i{font-style:normal}
+#menuChips{margin-top:2px}
+#trTitle{font-size:clamp(34px,11vw,60px);font-weight:900;letter-spacing:.12em;line-height:1.1;text-shadow:0 0 30px currentColor;animation:resIn .6s cubic-bezier(.2,1.4,.4,1)}
+#trTitle small{display:block;font-size:.3em;letter-spacing:.14em;margin-top:6px;color:#dfe9ff;text-shadow:none}
+#trFloor b{font-size:clamp(40px,12vw,64px);font-weight:900;color:#fff}
+#trFloor span{font-size:18px;color:#9fb4d4}
+#trStats{width:100%;max-width:380px;padding:8px 14px}
+.trRow{display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
+.trRow:last-child{border-bottom:0}
+.trRow span{color:#9fb4d4}
+
+/* ================= HUD（v3） ================= */
+#zoneLine{font-size:clamp(11px,1.7vmin,13px);font-weight:800;white-space:nowrap;display:none}
+#lifeBox{font-size:clamp(13px,2.2vmin,17px);font-weight:900;color:#ff9aa6;white-space:nowrap;display:none}
+#lifeBox.low{animation:blink .8s ease-in-out infinite}
+#towerBar{position:absolute;left:50%;top:calc(8px + var(--safeT));transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:3px;text-align:center}
+#towerBar.on{display:flex}
+#twFloor{font-size:clamp(20px,4.4vmin,32px);font-weight:900;color:#ffd23d;letter-spacing:.08em;text-shadow:0 0 14px rgba(255,210,60,.6),0 2px 4px rgba(0,0,0,.6)}
+#twText{font-size:clamp(12px,2vmin,15px);font-weight:800;padding:2px 12px;border-radius:12px;background:rgba(4,6,15,.5);white-space:nowrap}
+#bossBar{display:none;flex-direction:column;align-items:center;gap:2px;margin-top:2px}
+#bossBar.on{display:flex}
+#bossName{font-size:12px;color:#e8c4ff}
+.bbTrack{width:clamp(160px,36vmin,320px);height:9px;border-radius:5px;background:rgba(255,255,255,.12);overflow:hidden}
+#bossFill{display:block;height:100%;background:linear-gradient(90deg,#a060ff,#ff5ea8);transform-origin:0 50%}
+body[data-rule=tower] #teamScore,body[data-rule=tower] #ping,body[data-rule=tower] #netWarn{display:none}
+#respawn.out{background:none;justify-content:flex-start;padding-top:calc(16vh + var(--safeT))}
+#respawn.out #respawnNum{font-size:clamp(28px,7vmin,54px)}
+#respawn.over{background:radial-gradient(ellipse at center,rgba(40,0,10,.45),rgba(10,0,6,.8));justify-content:center;padding-top:0}
+#respawn.over #respawnNum{font-size:clamp(40px,11vmin,90px);color:#ffb3c0}
+
+/* ================= ダンス ================= */
+#danceOv{position:fixed;inset:0;z-index:16;display:none;flex-direction:column;align-items:center;justify-content:space-between;pointer-events:auto;cursor:pointer;
+  padding:calc(4vh + var(--safeT)) 16px calc(5vh + var(--safeB));background:linear-gradient(180deg,rgba(3,5,14,.35),transparent 30%,transparent 72%,rgba(3,5,14,.45));--tc:#7fd6ff}
+#danceOv.on{display:flex}
+#dvTitle{font-size:clamp(40px,11vmin,92px);font-weight:900;letter-spacing:.14em;line-height:1.05;color:var(--tc);text-shadow:0 0 30px var(--tc),0 4px 10px rgba(0,0,0,.6);animation:resIn .7s cubic-bezier(.2,1.4,.4,1)}
+#dvSub{font-size:clamp(16px,3.4vmin,26px);font-weight:800;letter-spacing:.12em;color:var(--tc);text-shadow:0 0 12px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.7)}
+#dvNames{font-size:clamp(13px,2.4vmin,17px);color:#eaf4ff;text-shadow:0 2px 6px rgba(0,0,0,.8);margin-top:6px}
+.dvTop{display:flex;flex-direction:column;align-items:center;gap:2px}
+.dvSkip{font-size:12px;letter-spacing:.14em;color:rgba(234,244,255,.75);padding:6px 14px;border-radius:14px;background:rgba(4,6,15,.4);animation:blink 1.6s ease-in-out infinite}
+
+/* ================= マップをつくる / エディター ================= */
+.mkGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
+@media (max-width:560px){.mkGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.mkBtn{min-height:58px;padding:8px}
+.mkBtn b{display:block;font-size:14px;letter-spacing:.04em}
+.myMaps{display:flex;flex-direction:column;gap:8px;width:100%}
+.myMap{display:flex;align-items:center;gap:10px;padding:8px 10px;text-align:left;flex-wrap:wrap}
+.mthumb{width:64px;height:64px;border-radius:8px;image-rendering:pixelated;background:#0a0f24;border:1px solid rgba(255,255,255,.12);flex:none}
+.mmInfo{flex:1;min-width:120px;display:flex;flex-direction:column;gap:2px}
+.mmInfo b{font-size:15px}
+.mmInfo small{font-size:11.5px;color:#9fb4d4}
+.mmBtns{display:flex;gap:6px;flex-wrap:wrap}
+.mapCard.custom .thumb{display:flex;align-items:center;justify-content:flex-start;padding-left:8px}
+.mapCard.custom .thumb .mthumb{width:52px;height:52px}
+#edHud{position:fixed;inset:0;z-index:13;display:none;pointer-events:none;color:#eaf4ff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+#edHud.on{display:block}
+.edTop{position:absolute;left:calc(10px + var(--safeL));right:calc(10px + var(--safeR));top:calc(8px + var(--safeT));display:flex;align-items:center;gap:8px}
+.edb{pointer-events:auto;cursor:pointer;flex:none;width:44px;height:44px;border-radius:12px;font-family:inherit;font-size:20px;color:#eaf4ff;
+  background:rgba(8,14,34,.6);border:1px solid rgba(127,214,255,.45)}
+.edb.txt{width:auto;padding:0 11px;font-size:12px;font-weight:800;letter-spacing:.04em}
+.edb.sel{background:rgba(255,210,138,.35);border-color:#ffd28a}
+.edb:disabled{opacity:.35}
+.edInfo{flex:1;min-width:0;display:flex;flex-direction:column;padding:3px 10px;border-radius:12px;background:rgba(4,6,15,.45)}
+.edInfo b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edInfo small{font-size:11px;color:#bcd0ea;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#edCross{position:absolute;left:50%;top:50%;width:0;height:0}
+#edCross i{position:absolute;background:#fff;box-shadow:0 0 2px rgba(0,0,0,.9)}
+#edCross i:first-child{left:-9px;top:-1px;width:18px;height:2px}
+#edCross i:last-child{left:-1px;top:-9px;width:2px;height:18px}
+#edTool{position:absolute;left:50%;top:calc(50% + 18px);transform:translateX(-50%);font-size:12px;font-weight:800;padding:1px 8px;border-radius:8px;background:rgba(4,6,15,.4)}
+#edBar{position:absolute;left:50%;bottom:calc(10px + var(--safeB));transform:translateX(-50%);display:flex;gap:4px;pointer-events:auto;padding:5px;border-radius:14px;
+  background:rgba(4,6,15,.55);border:1px solid rgba(127,214,255,.25);max-width:calc(100vw - 20px);overflow-x:auto}
+.edSlot{position:relative;cursor:pointer;flex:none;width:52px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px 3px;border-radius:10px;
+  font-family:inherit;color:#dfe9ff;background:rgba(255,255,255,.04);border:1px solid transparent}
+.edSlot.sel{border-color:#ffd28a;background:rgba(255,210,138,.18);box-shadow:0 0 12px rgba(255,210,138,.3)}
+.edSlot small{font-size:9.5px;white-space:nowrap;letter-spacing:0}
+.edSlot u{position:absolute;left:4px;top:2px;font-size:9px;text-decoration:none;color:#9fb4d4}
+.edSw{width:26px;height:26px;border-radius:5px;box-shadow:inset -3px -3px 0 rgba(0,0,0,.25),inset 2px 2px 0 rgba(255,255,255,.2);font-style:normal;font-size:14px;line-height:26px;text-align:center}
+.edSw.glow{box-shadow:0 0 10px currentColor,inset 0 0 6px rgba(255,255,255,.6)}
+.edSw.spawn{color:#fff;border-radius:50%}
+#edHelp{position:absolute;left:50%;bottom:calc(84px + var(--safeB));transform:translateX(-50%);font-size:11.5px;color:#bcd0ea;padding:3px 10px;border-radius:10px;background:rgba(4,6,15,.4);white-space:nowrap}
+body.touch #edHelp{display:none}
+body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
+.ti-layer.ti-editor .ti-small{display:none!important}   /* エディターは じぶんの ≡ を使う */
+/* エディターでは ボムの数・たまぎれ などの しるしは いらない */
+.ti-layer.ti-editor .ti-badge,.ti-layer.ti-editor .ti-ring,.ti-layer.ti-editor .ti-fire i,.ti-layer.ti-editor .ti-fire small{display:none!important}
+.ti-layer.ti-editor .ti-btn{opacity:1!important;animation:none!important}
+#edLock{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;background:rgba(3,5,14,.3)}
+#edLock.on{display:flex}
+#edLock span{font-size:clamp(18px,3.6vmin,26px);font-weight:800;letter-spacing:.16em;padding:14px 26px;border-radius:16px;background:rgba(10,18,40,.85);border:1px solid rgba(127,214,255,.55);text-align:center}
+#edLock small{display:block;font-size:12px;letter-spacing:.08em;color:#9fb4d4;margin-top:6px;font-weight:500}
+.edForm{width:100%;padding:8px 14px}
+.edForm .setRow{grid-template-columns:minmax(70px,auto) 1fr}
+.edForm input[type=text]{max-width:none;font-size:16px;text-align:left}
+.edForm select{grid-column:2}
+
+/* ================= スキン ================= */
+.skWrap{display:grid;grid-template-columns:minmax(0,280px) minmax(0,1fr);gap:14px;width:100%;align-items:start;text-align:left}
+@media (max-width:700px){.skWrap{grid-template-columns:1fr}}
+.skPrev{padding:10px;display:flex;flex-direction:column;align-items:center;gap:8px;position:sticky;top:0;z-index:1}
+#skCanvas{width:100%;height:240px;display:block;border-radius:12px;background:#070b1c;touch-action:none;cursor:grab}
+@media (max-width:700px){#skCanvas{height:190px}}
+.skTeam .btn{flex:1}
+.skEdit{display:flex;flex-direction:column;gap:8px;min-width:0}
+.skEdit h3 span{font-size:11px;color:#7890b4;letter-spacing:.04em;margin-left:6px;font-weight:500}
+.skSw{display:flex;flex-wrap:wrap;gap:6px}
+.sw{position:relative;cursor:pointer;width:34px;height:34px;border-radius:9px;border:2px solid rgba(255,255,255,.18);font-family:inherit;color:#fff;font-size:10px;font-weight:800;
+  box-shadow:inset -3px -3px 0 rgba(0,0,0,.2)}
+.sw.sel{border-color:#fff;box-shadow:0 0 0 2px #7fd6ff,0 0 12px rgba(127,214,255,.6)}
+.sw.team{width:auto;padding:0 8px;background:linear-gradient(135deg,#ff4d5e 50%,#3da2ff 50%)}
+.sw.pickc{display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(255,255,255,.06);overflow:hidden}
+.sw.pickc input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.skFaces{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:6px}
+.face{cursor:pointer;font-family:inherit;color:#dfe9ff;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:10px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}
+.face canvas{image-rendering:pixelated;border-radius:4px}
+.face small{font-size:10.5px}
+.face.sel{border-color:#7fd6ff;box-shadow:0 0 0 2px rgba(127,214,255,.45)}
+.skPaint{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.skGrid{--body:#ff4d5e;display:grid;grid-template-columns:repeat(16,1fr);gap:1px;width:min(380px,88vw);aspect-ratio:1;padding:5px;border-radius:12px;
+  background:var(--body);box-shadow:inset 0 0 0 4px rgba(0,0,0,.18);touch-action:none;cursor:crosshair;user-select:none;-webkit-user-select:none}
+.skGrid i{display:block;border-radius:1px;background:transparent;outline:1px dashed rgba(255,255,255,.16);outline-offset:-1px}
+.skGrid i.c8{outline-color:rgba(0,0,0,.25)}
+.skTools{display:flex;flex-direction:column;gap:8px;flex:1 1 220px;min-width:0}
+.skPix{display:grid;grid-template-columns:repeat(auto-fill,34px);gap:5px}
+.px{cursor:pointer;width:34px;height:34px;border-radius:8px;border:2px solid rgba(255,255,255,.2);font-family:inherit;font-weight:900;color:#fff;font-size:13px;
+  background:rgba(255,255,255,.06);text-shadow:0 1px 2px #000;padding:0}
+.px.sel{border-color:#fff;box-shadow:0 0 0 2px #7fd6ff}
+.skNet{display:grid;grid-template-columns:repeat(4,52px);grid-template-rows:repeat(3,52px);gap:3px;align-self:center}
+.skNet button{width:52px;height:52px;padding:2px;border-radius:6px;border:2px solid rgba(255,255,255,.18);background:rgba(0,0,0,.25);cursor:pointer}
+.skNet button canvas{width:100%;height:100%;image-rendering:pixelated;display:block;border-radius:3px}
+.skNet button.sel{border-color:#7fd6ff;box-shadow:0 0 0 2px rgba(127,214,255,.5)}
+.btn.sm.sel{border-color:#7fd6ff;background:rgba(70,140,255,.25)}
+.skChips{display:flex;flex-wrap:wrap;gap:6px}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<!-- ============ HUD ============ -->
+<div id="hud" aria-hidden="true">
+  <div id="vignette"></div>
+  <div id="tags"></div>
+  <div id="dmgDirs"></div>
+  <div id="scope"><i></i></div>
+  <div id="crosshair"><i class="ct"></i><i class="cb"></i><i class="cl"></i><i class="cr"></i><i class="cd"></i><div id="charge"><b></b></div></div>
+  <div id="shotWait"><b></b><span></span></div>
+  <div id="hitmark"><i></i><i></i><i></i><i></i></div>
+  <div id="teamScore"><div id="score0" class="sc">0</div><div class="scMid"><div id="timer">8:00</div><div id="toWin">10キルで勝ち</div><div id="zoneLine"></div></div><div id="score1" class="sc">0</div></div>
+  <div id="towerBar"><div id="twFloor">1F</div><div id="twText"></div><div id="bossBar"><b id="bossName"></b><div class="bbTrack"><i id="bossFill"></i></div></div></div>
+  <div id="ping">0ms</div>
+  <div id="netWarn">つながりが不安定です</div>
+  <div id="killfeed"></div>
+  <div id="protect">むてき</div>
+  <div id="weakTag"></div>
+  <div id="centerMsg"></div>
+  <div id="hpBox"><div id="hpNum">100</div><div class="hpTrack"><div id="hpBar"></div></div><div id="lifeBox"></div></div>
+  <div id="bombBox"><div id="bombName">ボム</div><div id="bombPips"></div><div class="bTrack" id="bombCdTrack"><div id="bombCdBar"></div></div><div id="bjLine"></div></div>
+  <div id="ammoBox"><span id="ammoNum">30</span><span id="ammoMag">/ 30</span><div class="rTrack" id="reloadTrack"><div id="reloadBar"></div></div><div id="reloadTxt">リロード中</div><div id="gunLine"></div></div>
+  <div id="respawn"><div class="respawnSub" id="respawnSub">ふっかつまで</div><div id="respawnNum">3</div><div id="respawnBy">やられた</div></div>
+  <div id="board"></div>
+  <div id="practiceSign">ためし撃ち<small>しあいではありません</small></div>
+  <div id="clickToPlay"><span>クリックでプレイ<small>Esc でメニュー</small></span></div>
+</div>
+
+<!-- ボタン配置エディターのうしろ（ゲーム画面のかわりの目安） -->
+<div id="layoutBg" aria-hidden="true">
+  <div class="lg lgHp">HP 100</div>
+  <div class="lg lgAmmo">30 / 30</div>
+  <div class="lg lgScore">0 ・ 8:00 ・ 0</div>
+  <div class="lg lgCross"></div>
+</div>
+
+<div id="touch"></div>
+
+<!-- ============ タイトル ============ -->
+<section id="scTitle" class="screen">
+  <div class="floor" aria-hidden="true">
+    <div class="roller" style="--s:26px;--c:#ff4d5e;--delay:0s"><i></i></div>
+    <div class="roller" style="--s:20px;--c:#3da2ff;--delay:-9s"><i></i></div>
+    <div class="roller" style="--s:32px;--c:#7fd6ff;--delay:-17s"><i></i></div>
+    <div class="roller" style="--s:18px;--c:#ff5ea8;--delay:-24s"><i></i></div>
+  </div>
+  <div class="panel">
+    <h1 class="logo" aria-label="CUBE STRIKE 2">CU<span class="cb"></span>E STRIKE <span class="two">2</span></h1>
+    <div class="kana">キ ュ ー ブ ス ト ラ イ ク ２</div>
+    <p class="titleLead">ブロックになって<b>転がって撃ち合う</b>、チーム対戦FPS の 続編！<br>銃は <b>57しゅるい</b>・<b>部品</b>で 自分だけの銃に。みんなで <b>ボスレイド</b>にも いどもう！</p>
+    <div class="nameRow"><label for="inName">なまえ</label><input id="inName" type="text" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="なまえ"></div>
+    <div class="stack">
+      <button id="btnCreate" class="btn big pink" type="button">へやを作る</button>
+      <button id="btnJoinOpen" class="btn big" type="button">コードで参加</button>
+      <div class="row2">
+        <button id="btnCpu" class="btn" type="button">コンピューター戦<small>1対1〜3対3</small></button>
+        <button id="btnTower" class="btn" type="button">塔のぼり<small>ひとりで30かい</small></button>
+      </div>
+      <div class="row2">
+        <button id="btnLoadoutOpen" class="btn" type="button">ぶきをえらぶ<small id="loadoutLabel">アサルトライフル ＋ フラグボム</small></button>
+        <button id="btnSkin" class="btn" type="button">スキン<small>じぶんのブロック</small></button>
+      </div>
+      <div class="row2">
+        <button id="btnStages" class="btn" type="button">みんなのステージ<small>公開された マップで あそぶ</small></button>
+        <button id="btnMaps" class="btn" type="button">マップをつくる<small>作って 公開もできる</small></button>
+      </div>
+      <div class="row4">
+        <button id="btnFriends" class="btn ghost" type="button">フレンド<b id="frBadge" class="badge" style="display:none">0</b></button>
+        <button id="btnPractice" class="btn ghost" type="button">ためし撃ち</button>
+        <button id="btnHow" class="btn ghost" type="button">あそびかた</button>
+        <button id="btnSettings" class="btn ghost" type="button">せってい</button>
+      </div>
+    </div>
+    <div class="titleFoot"><a href="../index.html">← アーケードへ戻る</a><span class="ver" id="verLabel">1v1〜3v3 ・ 4つのルール ・ 塔のぼり ・ スマホ・PC対応</span></div>
+  </div>
+</section>
+
+<!-- ============ へやを作る ============ -->
+<section id="scCreate" class="screen">
+  <div class="panel wide" style="max-width:760px">
+    <h2>へやを作る</h2>
+    <div class="hint">人数とマップをえらんでね。全員そろったら しあい開始！</div>
+    <div class="seg" role="group" aria-label="人数">
+      <button class="btn sel" type="button" data-mode="1v1"><b>1対1</b><small>タイマン</small></button>
+      <button class="btn" type="button" data-mode="2v2"><b>2対2</b><small>チーム戦</small></button>
+      <button class="btn" type="button" data-mode="3v3"><b>3対3</b><small>みんなで</small></button>
+    </div>
+    <h3>ルール</h3>
+    <div id="ruleGrid" class="ruleGrid"></div>
+    <div id="ruleN" class="seg ruleN"></div>
+    <h3>マップ</h3>
+    <div id="mapGrid"></div>
+    <div id="createMsg" class="msg"></div>
+    <div class="stack">
+      <button id="btnCreateGo" class="btn big pink" type="button">この設定で作る</button>
+      <button id="btnCreateBack" class="btn ghost" type="button" data-back>もどる</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ コンピューターと対戦（オフライン） ============ -->
+<section id="scCpu" class="screen">
+  <div class="panel wide" style="max-width:760px">
+    <h2>コンピューターと対戦</h2>
+    <div class="hint">ひとりで あそべる オフライン対戦。ルールも オンラインと同じように えらべます。</div>
+    <h3>人数</h3>
+    <div class="seg" role="group" aria-label="人数">
+      <button class="btn" type="button" data-cpumode="1v1"><b>1対1</b><small>てき1</small></button>
+      <button class="btn" type="button" data-cpumode="2v2"><b>2対2</b><small>なかま1・てき2</small></button>
+      <button class="btn" type="button" data-cpumode="3v3"><b>3対3</b><small>なかま2・てき3</small></button>
+    </div>
+    <h3>つよさ</h3>
+    <div class="lvGrid" role="group" aria-label="つよさ">
+      <button class="lvCard lv-flee" type="button" data-cpulv="flee"><b><span>逃げるだけ</span><i>れんしゅう</i></b><small>相手は逃げ回るだけで撃ってこない</small></button>
+      <button class="lvCard lv-easy" type="button" data-cpulv="easy"><b><span>よわい</span><i>★</i></b><small>反応がおそくて ねらいも あまい</small></button>
+      <button class="lvCard lv-normal" type="button" data-cpulv="normal"><b><span>ふつう</span><i>★★</i></b><small>よけたり ボムを投げたりしてくる</small></button>
+      <button class="lvCard lv-hard" type="button" data-cpulv="hard"><b><span>つよい</span><i>★★★</i></b><small>すばやく正確。ピンチは引いて回復</small></button>
+    </div>
+    <h3>ルール</h3>
+    <div id="cpuRuleGrid" class="ruleGrid"></div>
+    <div id="cpuRuleN" class="seg ruleN"></div>
+    <h3>マップ</h3>
+    <div id="cpuMapGrid"></div>
+    <h3>ぶき</h3>
+    <div class="cpuGears glass">
+      <div class="cpuGear">
+        <div class="gl"><small>じぶん</small><span id="cpuGearLabel">アサルトライフル ＋ フラグボム</span></div>
+        <button id="btnCpuLoadout" class="btn ghost" type="button">ぶきをかえる</button>
+      </div>
+      <div class="cpuGear" id="cpuEnemyRow">
+        <div class="gl"><small>てき（CPU）</small><span id="cpuEnemyLabel">おまかせ（1人ずつランダム）</span></div>
+        <button id="btnCpuEnemyLoadout" class="btn ghost" type="button">ぶきをえらぶ</button>
+      </div>
+      <div class="cpuGear" id="cpuAllyRow">
+        <div class="gl"><small>なかま（CPU）</small><span id="cpuAllyLabel">おまかせ（1人ずつランダム）</span></div>
+        <button id="btnCpuAllyLoadout" class="btn ghost" type="button">ぶきをえらぶ</button>
+      </div>
+    </div>
+    <div id="cpuMsg" class="msg"></div>
+    <div class="stack">
+      <button id="btnCpuGo" class="btn big pink" type="button">たたかう</button>
+      <button id="btnCpuBack" class="btn ghost" type="button" data-back>もどる</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ コードで参加 ============ -->
+<section id="scJoin" class="screen">
+  <div class="panel">
+    <h2>コードで参加</h2>
+    <p class="lead">友達から届いた <b>6文字のコード</b> を入れてね。</p>
+    <input id="inCode" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" placeholder="······">
+    <div id="joinMsg" class="msg"></div>
+    <div class="stack">
+      <button id="btnJoinGo" class="btn big pink" type="button">参加する</button>
+      <button id="btnJoinBack" class="btn ghost" type="button" data-back>もどる</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ぶきをえらぶ ============ -->
+<section id="scLoadout" class="screen">
+  <div class="panel wide">
+    <h2 id="loadoutTitle">ぶきをえらぶ</h2>
+    <div class="note" id="loadoutNote">しあい中は武器を変えられません</div>
+    <div class="lnav"><button class="btn ghost" type="button" data-jump="partsSec">部品</button><button class="btn ghost" type="button" data-jump="presetSec">組み合わせ</button><button class="btn ghost" type="button" data-jump="gunSec">じゅう（57）</button><button class="btn ghost" type="button" data-jump="bombSec">ボム（8）</button></div>
+    <div id="gunSlots" class="gunSlots">
+      <button type="button" class="btn slot sel" data-slot="0"><small>メイン（1）</small><b id="slotName0">-</b></button>
+      <button type="button" class="btn slot" data-slot="1"><small>サブ（2）</small><b id="slotName1">-</b></button>
+      <p class="hint">銃は 2つ もてる（おなじ銃を 2つでも OK）。上で「メイン」か「サブ」を えらんでから 下の銃を おしてね。<b>スナイパー系</b>を もつと 銃は 1つだけ。しあい中は X キー・マウスホイール・「切替」ボタンで もちかえ</p>
+    </div>
+    <div id="partsSec" class="grp"></div>
+    <div id="presetSec" class="grp"></div>
+    <div id="gunSec" class="grp"><div id="gunGrid"></div></div>
+    <div id="bombSec" class="grp bombs"><h3>ボム<span>1つえらぶ（しあい中に回復して何回も使える）</span></h3><div id="bombGrid" class="cgrid"></div></div>
+    <div class="lfoot">
+      <div id="loadoutSum"></div>
+      <button id="btnLoadoutBack" class="btn ghost" type="button" data-back>もどる</button>
+      <button id="btnLoadoutOk" class="btn pink" type="button">これにする</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ロビー ============ -->
+<section id="scLobby" class="screen">
+  <div class="panel wide" style="max-width:720px">
+    <div class="codeLabel">へやのコード</div>
+    <div id="lobbyCode">------</div>
+    <div class="row">
+      <button id="btnCopy" class="btn ghost" type="button">コピー</button>
+      <button id="btnShare" class="btn ghost" type="button">送る</button>
+    </div>
+    <div id="lobbyInfo"></div>
+    <div class="teams">
+      <div id="team0" class="team t0"></div>
+      <div id="team1" class="team t1"></div>
+    </div>
+    <div id="lobbyMsg" class="msg"></div>
+    <div id="lobbyRulePanel" class="glass lrp">
+      <h3>ルール</h3>
+      <div id="lobbyRuleGrid" class="ruleGrid"></div>
+      <div id="lobbyRuleN" class="seg ruleN"></div>
+      <h3>マップ</h3>
+      <select id="lobbyMap" aria-label="マップ"></select>
+      <div class="row" style="flex-wrap:nowrap">
+        <button id="btnLobbyRuleOk" class="btn pink" type="button" style="flex:1">これにする</button>
+        <button id="btnLobbyRuleCancel" class="btn ghost" type="button" style="flex:1">やめる</button>
+      </div>
+    </div>
+    <div id="lobbyInvite" class="glass lInv"><h3>オンラインのフレンド</h3><div id="lobbyInvList"></div></div>
+    <div class="stack">
+      <button id="btnStart" class="btn big pink" type="button" disabled>しあい開始</button>
+      <div class="row" style="flex-wrap:nowrap">
+        <button id="btnReady" class="btn green" type="button" style="flex:1">じゅんびOK</button>
+        <button id="btnLobbyLoadout" class="btn" type="button" style="flex:1">ぶきをかえる</button>
+      </div>
+      <div class="row" style="flex-wrap:nowrap">
+        <button id="btnLobbyInvite" class="btn ghost" type="button" style="flex:1.4">フレンドをさそう</button>
+        <button id="btnLobbySkin" class="btn ghost" type="button" style="flex:1">スキン</button>
+      </div>
+      <button id="btnLobbyRule" class="btn ghost" type="button" style="display:none">ルール・マップを かえる</button>
+      <button id="btnLeave" class="btn ghost" type="button">へやを出る</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ リザルト ============ -->
+<section id="scResult" class="screen">
+  <div class="panel">
+    <div id="resTitle"></div>
+    <div id="resScore"></div>
+    <div id="resRule" class="hint"></div>
+    <div class="tblWrap glass"><table id="resTable"></table></div>
+    <div id="resMsg" class="msg"></div>
+    <div class="stack">
+      <button id="btnAgain" class="btn big pink" type="button">ロビーへもどる</button>
+      <button id="btnResTitle" class="btn ghost" type="button">町へ</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ あそびかた ============ -->
+<section id="scHow" class="screen">
+  <div class="panel wide" style="max-width:960px">
+    <h2>あそびかた</h2>
+    <div class="rules">
+      <div class="rule"><b>チーム戦</b>あか と あお の<br><strong>チーム戦</strong>（1対1〜3対3）</div>
+      <div class="rule"><b>ルール</b>ルールは5つ<br><strong>キル・タイム・ストック・エリア・キング</strong></div>
+      <div class="rule"><b>ふっかつ</b>やられても <strong>3秒で復活</strong><br>復活してから5秒むてき（撃つかボムを投げると解除）</div>
+      <div class="rule"><b>ダメージ</b>どこに当てても<br><strong>ヘッドショットと同じダメージ</strong></div>
+      <div class="rule"><b>ぶき</b>銃2つとボムを<br><strong>しあい前にえらぶ</strong>（X キーで 切りかえ）</div>
+      <div class="rule"><b>スライディング</b>走りながら<br><strong>スライディング</strong>（低くなって当たりにくい）</div>
+      <div class="rule"><b>ジャンプ</b>1ブロックの段差は<br><strong>ジャンプ</strong>でのぼる（オートジャンプなら すっと のぼる）</div>
+      <div class="rule"><b>大ジャンプ</b>ジャンプして すぐ もう一回で<br><strong>6ブロックの 高さ</strong>まで とべる（4秒に 1回）</div>
+      <div class="rule"><b>CPU</b><strong>コンピューター</strong>とも<br>対戦できる（つよさ4段階）</div>
+      <div class="rule"><b>必殺技</b>てきを 3回 たおすと<br><strong>必殺技</strong>（F キー / 必殺ボタン）</div>
+      <div class="rule"><b>ステージ</b>ステージは ぜんぶ<br><strong>屋外</strong>（公園・さばく・夕やけ ほか）</div>
+      <div class="rule"><b>クリスタル</b>みんなで<br><strong>クリスタルまもり</strong>（10ウェーブ）</div>
+      <div class="rule"><b>トーナメント</b>人数を きめて<br><strong>かちぬき戦</strong>（2〜64人）</div>
+    </div>
+    <p class="hint"><strong>必殺技</strong>：てきを たおすと 画面の下の <b>必殺ゲージ</b>が たまります（3キルで まんたん）。まんたんで <kbd>F</kbd> キー（スマホは「必殺」ボタン・パッドは Y）。<b>スナイパーマシンガン</b>（8秒 スコープつきの ちょう れんしゃ・<b>当たれば 一発</b>・弾は むげん）／<b>スーパーバリア</b>（6秒 こうげきが きかない）／<b>ボムラッシュ</b>（7秒 ボムが なげほうだい）／<b>せんしゃ</b>（10秒 せんしゃに なる。うしろから 見る 視点・ダメージ 3分の1・大砲）／<b>バブル</b>（12秒 あわに 入って ふわふわ 浮く。ジャンプで 上・スライディングで 下。1回 当たると あわが われて 落ちる）／<b>コピー</b>（15秒 じぶんと おなじ 見た目・おなじ 銃の コピーが となりに あらわれて いっしょに たたかう。コピーが たおした てきは じぶんの 点。塔のぼりでは つかえない）／<b>アイスフィールド</b>（10秒 ぜんぶの 床が つるつるの 氷に。あいての チームは すべって 止まれない・曲がれない。じぶんの チームは へいき）から「ぶきをえらぶ」で えらべます。</p>
+    <p class="hint"><strong>銃を 2つ</strong>：「ぶきをえらぶ」で 銃を 2つ（メイン・サブ）えらべます。しあい中に <kbd>X</kbd>（<kbd>1</kbd> <kbd>2</kbd>・マウスホイール・スマホは「切替」ボタン・パッドは 十字キー）で 切りかえ。弾の数は 銃ごとに のこります。<b>ギガバースト</b>は じぶんの 体力を 50 つかって 大爆発（体力が 50 以下だと うてない）。<b>よわよわボム</b>に 当たると 7秒 こうげき力が 半分。<b>ワープボム</b>は 投げた ところに ワープ。<b>こおりボム</b>に 当たると 2秒 うごけない（向きを かえる・撃つ ことは できる）。</p>
+    <p class="hint"><strong>ランダムマッチ</strong>：タイトルの「ランダムマッチ」（町では バトルロビーの まんなか）で 1対1・2対2・3対3 を えらんで「さがす」。<b>おなじ ランク</b>の人と じどうで へやに 入って、そろったら じどうで はじまります。ランクは ブロンズ → シルバー → ゴールド → プラチナ → ダイヤ → マスター。勝つと +25、負けると -15（とちゅうで ぬけても -15）。20秒 まっても そろわないときは、ホストが「のこりを コンピューターで うめて はじめる」で はじめられます。</p>
+    <p class="hint"><strong>キング</strong>（ルール）：チームに 1人ずつ <b>キング</b>（王冠）が えらばれて、あいての キングを たおしたら 勝ち。キングは 体力が 多いけど、みんなで まもろう。へやでは ホストが あいている ところに <b>コンピューター</b>を 入れられます（つよさも かえられる）。</p>
+    <p class="hint"><strong>クリスタルまもり</strong>：まんなかの クリスタルを コンピューターの てきから まもる。10ウェーブ まもりきったら 勝ち。ひとりでも、「みんなで まもる」で へやを作って 4人まででも あそべます（人数が 多いほど てきが ふえる）。<strong>トーナメント</strong>：人数（2〜64人）を いれると、その人数で できる トーナメント表を つくります。じぶんの しあいは 1対1、ほかは コンピューターどうし。「みんなで トーナメント」で へやを作ると 友達と 8人まで いっしょに できます（人の しあいを ひとつずつ して、でていない人は かんせん。足りない人数は コンピューター）。人数が 半ぱなら シードの 人は 1回戦 おやすみ。</p>
+    <p class="hint"><strong>みんなで塔のぼり</strong>：塔のぼりの画面の「みんなで のぼる」で へやを作って、コードを 友達に送ろう（4人まで）。とびらは 一人ひとりが えらんで、<b>えらんだ チップは みんなに つきます</b>。つぎの かいは いちばん多く えらばれた とびら。のこりは みんなで ひとつ。人数が 多いほど てきが ふえて かたくなります。</p>
+    <p class="hint">キャラクターは ちょうど1ブロックの大きさ。歩いても ジャンプしても ねらいは ぶれません。しばらく撃たれないと体力が回復します。時間切れで同点なら、次のキルで決着（サドンデス）。</p>
+    <p class="hint"><strong>オートジャンプ</strong>をオンにすると、1ブロックの段差に向かって進むだけで とばずに 一瞬で一段上へ のぼれます（2ブロックの かべは のぼれません。せっていで切りかえ。スマホは さいしょからオン）。スライディング中にジャンプすると、いきおいのまま とべます。<strong>大ジャンプ</strong>：ジャンプして 上がっている あいだに もう一回 ジャンプを おすと、とんだ 場所から 約<b>6ブロック</b>の 高さまで とべます（高い かべや 屋根の 上にも のれる）。つかったら 4秒 まつと また つかえます（PC は 右下、スマホは ジャンプボタンの まわりの リングが みどりなら OK）。</p>
+    <p class="hint"><strong>コンピューターと対戦</strong>は ひとりで あそべる オフライン対戦（1対1〜3対3）。つよさは「逃げるだけ・よわい・ふつう・つよい」から えらべます。メニューを開くと ゲームが止まります（オンライン対戦は止まりません）。</p>
+    <p class="hint"><strong>ルール</strong>：キルバトル（先に きめた数だけ倒す）／タイムバトル（時間内に たくさん倒す）／ストック（ひとり のこり回数まで。全員いなくなったチームの負け）／エリア（まんなかのエリアを ひとりじめしている あいだ カウントが進む）。しあいが終わると、勝ったチームが ダンスで おいわい！（タップでスキップ）</p>
+    <p class="hint"><strong>塔のぼり</strong>：ひとりで 30かいの塔に ちょうせん。ぜんめつ・クリスタル・サバイバル・ボス（10・20・30かい）を クリアすると 光の柱が あらわれて、入ると「つぎの とびら」と「パワーアップチップ」を 3つから えらべます。★が多い とびらは てきが つよいけど、チップが 2こ ぶん。のこりが 0 に なったら おしまい。</p>
+    <p class="hint"><strong>スキン</strong>で じぶんのブロックの 色・かお（ドットで かける）・もよう・ぼうしを 作れます。ふち は チームの色のまま なので、チームは すぐ わかります。<strong>フレンド</strong>は フレンドコードか、いっしょに遊んだ人から 申請できて、オンラインなら へやに さそったり チャットしたり できます。<strong>マップをつくる</strong>では マイクラみたいに ブロックを おいて マップを作り、コンピューター戦や へやで つかえます。</p>
+    <p class="hint"><strong>みんなのステージ</strong>：作ったマップを「公開する」と、世界中の だれでも あそべるように なります（ステージの なまえと プレイヤー名が みんなに見えます）。みんなのステージは「CPUと あそぶ」でも「へやを作って 友達と」でも あそべます（友達は そのステージを 持っていなくても 大丈夫）。「リンクをコピー」で 送ると、ひらいた人は すぐ そのステージを えらべます。</p>
+    <p class="hint"><strong>ぶきの バランス</strong>：コンピューターどうしを よわい・ふつう・つよい で たくさん戦わせて、勝ちやすさが そろうように 連射・リロード・うごく速さを 調整しています（ダメージは そのまま）。ぶきの「あつかいやすさ」は、<b>よわいコンピューターが持っても 勝てる銃ほど 高い</b>（うまさに 左右されにくい）です。低い銃は うまくなるほど 強くなります。</p>
+    <p class="hint"><strong>コンピューターの かしこさ</strong>：エリアでは エリアを とりに行き、とったら まもります。相手の 出撃地点（陣地）には 入らず、やられて 出てきたばかりの人は ねらいません（リスキルしない）。</p>
+    <div class="ctrls">
+      <div class="ctrl glass"><h3>PC</h3><dl>
+        <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>いどう</dd>
+        <dt><kbd>マウス</kbd></dt><dd>ねらう（画面クリックで開始）</dd>
+        <dt><kbd>左クリック</kbd></dt><dd>うつ</dd>
+        <dt><kbd>右クリック</kbd></dt><dd>のぞく（ズーム）</dd>
+        <dt><kbd>Space</kbd></dt><dd>ジャンプ（すぐ もう一回で 大ジャンプ）</dd>
+        <dt><kbd>Shift</kbd><kbd>C</kbd></dt><dd>スライディング</dd>
+        <dt><kbd>Q</kbd><kbd>E</kbd><kbd>G</kbd></dt><dd>ボムを投げる</dd>
+        <dt><kbd>R</kbd></dt><dd>リロード</dd>
+        <dt><kbd>F</kbd></dt><dd>必殺技（ゲージ まんたんで）</dd>
+        <dt><kbd>X</kbd><kbd>1</kbd><kbd>2</kbd></dt><dd>銃を 切りかえ（ホイールでも）</dd>
+        <dt><kbd>Tab</kbd></dt><dd>スコア表</dd>
+        <dt><kbd>Esc</kbd><kbd>M</kbd></dt><dd>メニュー</dd>
+      </dl></div>
+      <div class="ctrl glass"><h3>スマホ・タブレット</h3><dl>
+        <dt>左はんぶん</dt><dd>スティックでいどう</dd>
+        <dt>右がわドラッグ</dt><dd>ねらう</dd>
+        <dt>うつ</dt><dd>タップで うつ・長押しで のぞきながら うつ（押したままドラッグでねらえる）</dd>
+        <dt>スコープの銃</dt><dd>押して のぞく → はなして うつ（スナイパー・マークスマン・クロスボウ・レールガン）</dd>
+        <dt>ジャンプ / スライド</dt><dd>ジャンプ（すばやく 2回で 大ジャンプ）/ スライディング</dd>
+        <dt>必殺</dt><dd>必殺技（まわりの リングが ゲージ。光ったら つかえる）</dd>
+        <dt>切替</dt><dd>2つの 銃を 切りかえ</dd>
+        <dt>ボム / リロード</dt><dd>ボムを投げる / リロード</dd>
+        <dt>≡ / スコア</dt><dd>メニュー / スコア表</dd>
+      </dl><p class="hint" style="margin-top:8px">ボタンの場所と大きさは「せってい → ボタンの配置・大きさ」で変えられます。スマホは よこ向き であそんでね。</p></div>
+      <div class="ctrl glass"><h3>コントローラー</h3><dl>
+        <dt>左スティック</dt><dd>いどう</dd>
+        <dt>右スティック</dt><dd>ねらう</dd>
+        <dt>RT / LT</dt><dd>うつ / のぞく</dd>
+        <dt>A</dt><dd>ジャンプ（2回で 大ジャンプ）</dd>
+        <dt>B / R3</dt><dd>スライディング</dd>
+        <dt>RB / LB</dt><dd>ボム</dd>
+        <dt>X</dt><dd>リロード</dd>
+        <dt>十字キー</dt><dd>銃を 切りかえ</dd>
+        <dt>Back / Start</dt><dd>スコア表 / メニュー</dd>
+      </dl></div>
+    </div>
+    <div class="stack"><button id="btnHowBack" class="btn" type="button" data-back>もどる</button></div>
+  </div>
+</section>
+
+<!-- ============ せってい ============ -->
+<section id="scSettings" class="screen">
+  <div class="panel">
+    <h2>せってい</h2>
+    <div class="setList glass">
+      <div class="setRow"><label for="setSens">マウス感度</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><output id="setSensVal">1.00</output></div>
+      <div class="setRow"><label for="setTouchSens">タッチ感度</label><input id="setTouchSens" type="range" min="0.2" max="3" step="0.05"><output id="setTouchSensVal">1.00</output></div>
+      <div class="setRow"><label for="setInvert">上下を反転</label><span></span><span class="switch"><input id="setInvert" type="checkbox"><span></span></span></div>
+      <div class="setRow"><label for="setFov">視野（FOV）</label><input id="setFov" type="range" min="60" max="100" step="1"><output id="setFovVal">78</output></div>
+      <div class="setRow"><label for="setQuality">画質</label><select id="setQuality"><option value="auto">おまかせ</option><option value="low">ひくい（かるい）</option><option value="med">ふつう</option><option value="high">たかい（きれい）</option></select></div>
+      <div class="setRow"><label for="setVol">音量</label><input id="setVol" type="range" min="0" max="1" step="0.05"><output id="setVolVal">80</output></div>
+      <div class="setRow sw"><label for="setAutoJump">オートジャンプ<small>1ブロックの段差を 一瞬で のぼる</small></label><span class="switch"><input id="setAutoJump" type="checkbox"><span></span></span></div>
+    </div>
+    <p class="hint">カクカクするときは 画質を「ひくい」にしてね。</p>
+    <div class="stack">
+      <button id="btnLayout" class="btn" type="button">ボタンの配置・大きさ<small id="layoutBtnSub">うつ・ジャンプなどの場所と大きさを変える</small></button>
+      <button id="btnSettingsBack" class="btn" type="button" data-back>もどる</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ボタンの配置・大きさ（タッチ操作のエディター） ============ -->
+<section id="scLayout" class="screen" aria-label="ボタンの配置・大きさ">
+  <div id="layPanel" class="layPanel" role="dialog" aria-labelledby="layTitle">
+    <div id="layHead" class="layHead">
+      <i class="layGrip" aria-hidden="true"></i>
+      <b id="layTitle">ボタンの配置・大きさ</b>
+      <button id="btnLayFold" class="layFold" type="button" aria-expanded="true">たたむ</button>
+    </div>
+    <div class="layBody">
+      <p id="layTip" class="layTip"><b>ドラッグ</b>で動かす・<b>タップ</b>でえらんで 大きさを変える</p>
+      <p class="layPortrait">よこ向きにすると しあい中と同じ配置で見られます</p>
+      <div class="layRow"><label id="laySelName" for="laySel">ボタンをえらんでね</label><input id="laySel" type="range" min="0.5" max="2" step="0.05" value="1" disabled><output id="laySelVal">—</output></div>
+      <div class="layRow"><label for="layAll">ぜんぶの大きさ</label><input id="layAll" type="range" min="0.6" max="1.6" step="0.05" value="1"><output id="layAllVal">100%</output></div>
+      <div class="layBtns">
+        <button id="btnLayoutReset" class="btn ghost" type="button">もとにもどす</button>
+        <button id="btnLayoutCancel" class="btn ghost" type="button">やめる</button>
+        <button id="btnLayoutSave" class="btn pink" type="button">ほぞん</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ メニュー（しあい中。オンラインは止まらない・オフラインはポーズ） ============ -->
+<section id="scMenu" class="screen">
+  <div class="panel">
+    <h2 id="menuTitle">メニュー</h2>
+    <p id="menuHint" class="hint">オンライン対戦は止まりません。</p>
+    <div id="menuChips" class="tpChips" style="display:none"></div>
+    <div class="stack">
+      <button id="btnResume" class="btn big pink" type="button">つづける</button>
+      <button id="btnMenuSettings" class="btn" type="button">せってい</button>
+      <button id="btnQuit" class="btn ghost" type="button">へやを出る</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ フレンド ============ -->
+<section id="scFriends" class="screen">
+  <div class="panel wide" style="max-width:720px">
+    <h2>フレンド</h2>
+    <div class="glass frMe">
+      <div class="codeLabel">あなたの フレンドコード</div>
+      <div id="frMyCode" class="frCode">----</div>
+      <div class="row">
+        <button id="btnFrCopy" class="btn ghost" type="button">コピー</button>
+        <button id="btnFrShare" class="btn ghost" type="button">送る</button>
+      </div>
+      <div id="frNet" class="hint"></div>
+    </div>
+    <div class="glass frAdd">
+      <h3>フレンドコードで 申請</h3>
+      <div class="frAddRow">
+        <input id="inFc" type="text" maxlength="9" placeholder="ABCD-2346" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="send">
+        <button id="btnFrAdd" class="btn pink" type="button">申請</button>
+      </div>
+      <div id="frMsg" class="msg"></div>
+    </div>
+    <div id="frReqBox" style="width:100%"></div>
+    <h3>フレンド <span id="frCount"></span></h3>
+    <div id="frList" class="frList"></div>
+    <div id="frOutBox" style="width:100%"></div>
+    <h3>さいきん いっしょに あそんだ人</h3>
+    <div id="frRecent" class="frList"></div>
+    <p class="hint">フレンドとは おたがいに「OK」すると なれます。チャットは フレンドどうしだけ。知らない人に フレンドコードを おしえないでね。</p>
+    <div class="stack"><button id="btnFrBack" class="btn ghost" type="button" data-back>もどる</button></div>
+  </div>
+</section>
+
+<!-- ============ チャット ============ -->
+<section id="scChat" class="screen">
+  <div class="panel">
+    <div class="chatHead glass">
+      <button id="btnChatBack" class="btn ghost" type="button" aria-label="もどる">←</button>
+      <div class="chatWho"><b id="chatName">—</b><small id="chatSt"></small></div>
+      <button id="btnChatInv" class="btn" type="button">さそう</button>
+      <button id="btnChatJoin" class="btn green" type="button">参加</button>
+    </div>
+    <div id="chatLog" class="chatLog glass"></div>
+    <div id="chatQuick" class="chatQuick"></div>
+    <div class="chatIn">
+      <input id="inChat" type="text" maxlength="80" placeholder="メッセージ" autocomplete="off" enterkeyhint="send">
+      <button id="btnChatSend" class="btn pink" type="button">送る</button>
+    </div>
+    <div class="chatFoot"><button id="btnChatRemove" class="btn ghost sm" type="button">フレンドをやめる</button></div>
+  </div>
+</section>
+
+<!-- ============ 塔のぼり ============ -->
+<section id="scTower" class="screen">
+  <div class="panel wide" style="max-width:760px">
+    <h2>塔のぼり</h2>
+    <p class="lead"><b>30かい</b>の塔を のぼろう。かいを クリアするたびに、<b>つぎの とびら</b>と <b>パワーアップチップ</b>を 3つから えらべる。のこりが 0 になったら おしまい。<br><b>友達と いっしょ</b>にも のぼれるよ（4人まで。えらんだ チップは みんなに つく！ そのぶん てきも つよい）</p>
+    <div id="twKinds" class="twKinds"></div>
+    <h3>むずかしさ</h3>
+    <div id="twDiff" class="seg"></div>
+    <div class="cpuGears glass">
+      <div class="cpuGear">
+        <div class="gl"><small>じぶんの ぶき</small><span id="twGearLabel">アサルトライフル ＋ フラグボム</span></div>
+        <button id="btnTwLoadout" class="btn ghost" type="button">ぶきをかえる</button>
+      </div>
+    </div>
+    <div id="twMsg" class="msg"></div>
+    <div class="stack">
+      <button id="btnTwGo" class="btn big pink" type="button">ひとりで のぼる！</button>
+      <button id="btnTwCoop" class="btn big" type="button">みんなで のぼる<small>へやを作って コードを送ろう（4人まで）</small></button>
+      <button id="btnTwBack" class="btn ghost" type="button" data-back>もどる</button>
+    </div>
+  </div>
+</section>
+
+<section id="scTowerPick" class="screen">
+  <div class="panel wide" style="max-width:920px">
+    <div class="twHead"><b id="tpTitle">1F クリア！</b><span id="tpStat"></span></div>
+    <h2>つぎの とびらを えらぼう</h2>
+    <p class="hint" id="tpHint">★が おおいほど てきが つよい。★★★ の とびらは チップが 2こぶん！</p>
+    <div id="tpCards" class="tpCards"></div>
+    <div id="tpWait" class="msg" style="display:none"></div>
+    <h3>もっている チップ</h3>
+    <div id="tpChips" class="tpChips"></div>
+    <div class="stack"><button id="btnTpQuit" class="btn ghost" type="button">ここで やめる</button></div>
+  </div>
+</section>
+
+<section id="scTowerResult" class="screen">
+  <div class="panel">
+    <div id="trTitle"></div>
+    <div id="trFloor"></div>
+    <div id="trStats" class="glass"></div>
+    <div id="trChips" class="tpChips"></div>
+    <div id="trMsg" class="msg"></div>
+    <div class="stack">
+      <button id="btnTrAgain" class="btn big pink" type="button">もう一回</button>
+      <button id="btnTrTitle" class="btn ghost" type="button">町へ</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ スキン ============ -->
+<section id="scSkin" class="screen">
+  <div class="panel wide" style="max-width:1000px">
+    <h2>お絵かきアトリエ</h2>
+    <div class="skWrap">
+      <div class="skPrev glass">
+        <canvas id="skCanvas"></canvas>
+        <div class="row skTeam" style="flex-wrap:nowrap">
+          <button class="btn ghost sm sel" type="button" data-skteam="0">あかチームで見る</button>
+          <button class="btn ghost sm" type="button" data-skteam="1">あおチームで見る</button>
+        </div>
+        <p class="hint">ドラッグで まわせるよ。まわりの ふち は チームの色のまま。</p>
+        <h3 style="align-self:flex-start;margin:4px 0 0">てんかいず <span style="font-size:11px;color:#7890b4;font-weight:500">おすと その面を かく</span></h3>
+        <div id="skNet" class="skNet"></div>
+      </div>
+      <div class="skEdit">
+        <h3>お絵かき <span>からだの 6つの 面に 16×16 の ドットで かけるよ</span></h3>
+        <div id="skFaceTabs" class="skChips"></div>
+        <div class="skPaint">
+          <div id="skGrid" class="skGrid"></div>
+          <div class="skTools">
+            <div id="skToolBtns" class="skChips"></div>
+            <div id="skPix" class="skPix"></div>
+            <div class="skChips">
+              <button id="skUndo" class="btn ghost sm" type="button">もどす</button>
+              <button id="skMirror" class="btn ghost sm" type="button">左右はんてん</button>
+              <button id="skCopyAll" class="btn ghost sm" type="button">この面を ぜんぶに コピー</button>
+              <button id="skClearFace" class="btn ghost sm" type="button">この面を けす</button>
+              <button id="skClearAll" class="btn ghost sm" type="button">ぜんぶ けす</button>
+            </div>
+          </div>
+        </div>
+        <h3>かおの プリセット <span>まえ（かお）の面に かく</span></h3>
+        <div id="skFaces" class="skFaces"></div>
+        <h3>からだの色</h3>
+        <div id="skColors" class="skSw"></div>
+        <h3>もよう</h3>
+        <div id="skPats" class="skChips"></div>
+        <h3>2つめの色 <span>もよう・ぼうしに つかう</span></h3>
+        <div id="skColors2" class="skSw"></div>
+        <h3>ぼうし</h3>
+        <div id="skHats" class="skChips"></div>
+      </div>
+    </div>
+    <div class="lfoot">
+      <button id="btnSkRandom" class="btn ghost" type="button">ランダム</button>
+      <button id="btnSkReset" class="btn ghost" type="button">いつもの</button>
+      <button id="btnSkBack" class="btn ghost" type="button">もどる</button>
+      <button id="btnSkOk" class="btn pink" type="button">これにする</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ マップをつくる ============ -->
+<section id="scMaps" class="screen">
+  <div class="panel wide" style="max-width:820px">
+    <h2>マップをつくる</h2>
+    <p class="lead">マイクラみたいに ブロックを おいて、じぶんだけの マップを作ろう。作ったマップは <b>コンピューター戦</b>や <b>へやを作る</b>ときに えらべます。<b>公開する</b>を おすと「みんなのステージ」に のって、だれでも あそべるように なります。</p>
+    <h3>あたらしく つくる</h3>
+    <div id="mkGrid" class="mkGrid"></div>
+    <h3>じぶんのマップ <span id="mapsCount"></span></h3>
+    <div id="myMaps" class="myMaps"></div>
+    <div class="stack"><button id="btnMapsBack" class="btn ghost" type="button" data-back>もどる</button></div>
+  </div>
+</section>
+
+<!-- ============ みんなのステージ ============ -->
+<section id="scStages" class="screen">
+  <div class="panel wide" style="max-width:860px">
+    <h2>みんなのステージ</h2>
+    <p class="lead">みんなが作って 公開した ステージで あそべます。<b>コンピューター戦</b>でも、<b>へやを作って 友達と</b>でも OK。じぶんのマップは「マップをつくる」の「公開する」で ここに のせられます。</p>
+    <div class="stTools">
+      <input id="stSearch" type="text" maxlength="16" placeholder="なまえ・作った人で さがす" autocomplete="off" spellcheck="false" enterkeyhint="search">
+      <button id="btnStReload" class="btn ghost sm" type="button">さいしん</button>
+    </div>
+    <div class="seg stTabs">
+      <button class="btn ghost sm sel" type="button" data-stf="new">あたらしい</button>
+      <button class="btn ghost sm" type="button" data-stf="saved">★ ほぞん</button>
+      <button class="btn ghost sm" type="button" data-stf="mine">じぶんの</button>
+    </div>
+    <div id="stStatus" class="msg"></div>
+    <div id="stGrid" class="stGrid"></div>
+    <p class="hint">★ で ほぞんした ステージと さいきん あそんだ ステージは、コンピューター戦・へやを作る の マップにも 出ます。いやな ステージは「かくす」で 見えなくできます。</p>
+    <div class="stack"><button id="btnStBack" class="btn ghost" type="button" data-back>もどる</button></div>
+  </div>
+  <div id="stDetail" class="stDetail" role="dialog" aria-labelledby="stDName">
+    <div class="stBox glass">
+      <div class="stHead">
+        <canvas id="stDThumb" class="mthumb"></canvas>
+        <div class="stHeadInfo"><b id="stDName">ステージ</b><small id="stDBy"></small><small id="stDMeta" class="stId"></small></div>
+      </div>
+      <div class="stPlay">
+        <button id="btnStCpu" class="btn pink" type="button">CPUと あそぶ</button>
+        <button id="btnStRoom" class="btn" type="button">へやを作って 友達と</button>
+      </div>
+      <div class="stMore">
+        <button id="btnStSave" class="btn ghost sm" type="button">☆ ほぞん</button>
+        <button id="btnStLink" class="btn ghost sm" type="button">リンクをコピー</button>
+        <button id="btnStCopy" class="btn ghost sm" type="button">コピーして へんしゅう</button>
+        <button id="btnStHide" class="btn ghost sm" type="button">かくす</button>
+        <button id="btnStUnpub" class="btn ghost sm warn" type="button">公開をやめる</button>
+      </div>
+      <button id="btnStClose" class="btn ghost" type="button">とじる</button>
+    </div>
+  </div>
+</section>
+
+<section id="scEdMenu" class="screen">
+  <div class="panel">
+    <h2>マップエディター</h2>
+    <div class="glass edForm">
+      <div class="setRow"><label for="edNameIn">なまえ</label><input id="edNameIn" type="text" maxlength="16" autocomplete="off"></div>
+      <div class="setRow"><label for="edTheme">いろ</label><select id="edTheme"></select></div>
+    </div>
+    <div id="edMenuMsg" class="msg"></div>
+    <div class="stack">
+      <button id="btnEdResume" class="btn big pink" type="button">つづける</button>
+      <button id="btnEdSave" class="btn" type="button">ほぞん</button>
+      <button id="btnEdTest" class="btn" type="button">このマップで たたかう（CPU）</button>
+      <button id="btnEdPub" class="btn pubBtn" type="button">みんなに公開する</button>
+      <button id="btnEdExit" class="btn ghost" type="button">ほぞんして おわる</button>
+      <button id="btnEdDiscard" class="btn ghost" type="button">ほぞんしないで おわる</button>
+    </div>
+    <p class="hint">PC: 左クリック こわす ／ 右クリック おく ／ ホイール・1〜0 ブロック ／ Space・Shift 上下 ／ F とぶ⇄あるく ／ Z もどす ／ X たいしょう</p>
+    <p class="hint">スマホ: 「おく」「こわす」ボタン ／ 「つぎ」で ブロック ／ 「うえ」「した」で 上下。⚑ は チームの スタート地点（上の面に おく）。</p>
+  </div>
+</section>
+
+<!-- ============ マップエディターの HUD ============ -->
+<div id="edHud" aria-hidden="true">
+  <div class="edTop">
+    <button id="edMenuBtn" class="edb" type="button" aria-label="メニュー">≡</button>
+    <div class="edInfo"><b id="edName">マップ</b><small id="edState"></small></div>
+    <button id="edUndoBtn" class="edb" type="button" aria-label="もどす">↶</button>
+    <button id="edSymBtn" class="edb txt" type="button" aria-label="たいしょう">たいしょう</button>
+    <button id="edFlyBtn" class="edb txt" type="button" aria-label="とぶ・あるく">とぶ</button>
+  </div>
+  <div id="edCross"><i></i><i></i></div>
+  <div id="edTool"></div>
+  <div id="edHelp">左クリック: こわす ／ 右クリック: おく ／ ホイール・1〜0: えらぶ ／ Space・Shift: 上下 ／ F: とぶ⇄あるく ／ Z: もどす ／ X: たいしょう ／ Esc: メニュー</div>
+  <div id="edBar"></div>
+  <div id="edLock"><span>クリックで へんしゅう<small>Esc で メニュー</small></span></div>
+</div>
+
+<!-- ============ 勝ったチームのダンス ============ -->
+<div id="danceOv" aria-live="polite">
+  <div class="dvTop"><div id="dvTitle">WIN!</div><div id="dvSub"></div><div id="dvNames"></div></div>
+  <div class="dvSkip">タップで スキップ</div>
+</div>
+
+<!-- ============ フレンドの おしらせ ============ -->
+<div id="frPop" class="frPop" role="dialog" aria-live="polite">
+  <div id="frPopText" class="fpText"></div>
+  <div class="fpBtns"><button id="frPopYes" class="btn pink" type="button">参加する</button><button id="frPopNo" class="btn ghost" type="button">あとで</button></div>
+</div>
+
+<!-- ============ たしかめ（公開する など） ============ -->
+<div id="csConfirm" class="csConfirm" role="dialog" aria-labelledby="cfTitle">
+  <div class="cfBox glass">
+    <b id="cfTitle"></b>
+    <p id="cfText"></p>
+    <div class="fpBtns"><button id="cfNo" class="btn ghost" type="button">やめる</button><button id="cfOk" class="btn pink" type="button">OK</button></div>
+  </div>
+</div>
+
+<div id="rotate"><div class="ic">↻</div><div>よこ向きにしてね</div><div class="hint">画面を横にすると あそべます</div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="peer.min.js?v=cs2-1"></script>
+<script src="js/core.js?v=cs2-1"></script>
+<script src="js/gunskins.js?v=cs2-1"></script>
+<script src="js/skins.js?v=cs2-1"></script>
+<script src="js/maps.js?v=cs2-1"></script>
+<script src="js/custommaps.js?v=cs2-1"></script>
+<script src="js/stages.js?v=cs2-1"></script>
+<script src="js/weapons.js?v=cs2-1"></script>
+<script src="js/weapons2.js?v=cs2-1"></script>
+<script src="js/parts.js?v=cs2-1"></script>
+<script src="js/bots.js?v=cs2-1"></script>
+<script src="js/render.js?v=cs2-1"></script>
+<script src="js/audio.js?v=cs2-1"></script>
+<script src="js/input.js?v=cs2-1"></script>
+<script src="js/net.js?v=cs2-1"></script>
+<script src="js/friends.js?v=cs2-1"></script>
+<script src="js/ui.js?v=cs2-1"></script>
+<script src="js/friends-ui.js?v=cs2-1"></script>
+<script src="js/ui-extra.js?v=cs2-1"></script>
+<script src="js/stages-ui.js?v=cs2-1"></script>
+<script src="js/skin-ui.js?v=cs2-1"></script>
+<script src="js/workshop.js?v=cs2-1"></script>
+<script src="js/specials.js?v=cs2-1"></script>
+<script src="js/game.js?v=cs2-1"></script>
+<script src="js/tower.js?v=cs2-1"></script>
+<script src="js/defense.js?v=cs2-1"></script>
+<script src="js/raid.js?v=cs2-1"></script>
+<script src="js/tourney.js?v=cs2-1"></script>
+<script src="js/ranked.js?v=cs2-1"></script>
+<script src="js/dance.js?v=cs2-1"></script>
+<script src="js/editor.js?v=cs2-1"></script>
+<script src="js/town.js?v=cs2-1"></script>
+<script src="js/main.js?v=cs2-1"></script>
+</body>
+</html>
