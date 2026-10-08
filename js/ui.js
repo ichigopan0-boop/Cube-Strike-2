@@ -776,21 +776,20 @@
   /* ==========================================================================
      ぶきの表示まわり
      ========================================================================== */
-  const GUN_GROUPS = [
-    { key: 'rifle', label: 'ライフル系', note: 'バランスよし。まよったらコレ', ids: ['ar', 'burst', 'dmr'] },
-    { key: 'rapid', label: '連射系', note: 'たまをばらまいて押しきる', ids: ['smg', 'lmg', 'minigun', 'dual'] },
-    { key: 'heavy', label: '一撃系', note: '当てれば大ダメージ', ids: ['sniper', 'magnum', 'rail', 'crossbow'] },
-    { key: 'shot', label: '散弾系', note: '近づいてドカン', ids: ['shotgun', 'double'] },
-    { key: 'sp', label: '特殊', note: 'ばくはつ・ビーム・ほのお', ids: ['rocket', 'grenade', 'laser', 'plasma', 'flame', 'needler', 'ricochet'] }
-  ];
+  /* CS2: 銃の なかまは weapons2.js（def.group） */
+  const GUN_GROUPS = (CS.Weapons && CS.Weapons.GROUPS) || [{ key: 'rifle', label: 'じゅう', note: '' }];
   const TYPE_TAG = { hitscan: 'そくちゃく', projectile: 'とびだま', beam: 'ビーム', flame: 'ほのお' };
+  function typeTag(def) {
+    if (def.solo) return 'スナイパー系';
+    if (def.group === 'support') return 'サポート';
+    if (def.type === 'projectile' && def.proj && def.proj.fast) return 'はやい弾';
+    return TYPE_TAG[def.type] || 'じゅう';
+  }
   const GUN_STATS = [['power', 'いりょく'], ['rate', 'れんしゃ'], ['range', 'しゃてい'], ['mobility', 'きどう'], ['ease', 'あつかいやすさ']];
   const BOMB_STATS = [['power', 'いりょく'], ['area', 'はんい'], ['cooldown', 'クールダウン'], ['ease', 'あつかいやすさ']];
 
   function groupOf(def) {
-    for (let i = 0; i < GUN_GROUPS.length; i++) {
-      if (GUN_GROUPS[i].ids.indexOf(def.id) >= 0) return GUN_GROUPS[i].key;
-    }
+    if (def.group) return def.group;
     if ((def.pellets | 0) > 1) return 'shot';
     if (def.type && def.type !== 'hitscan') return 'sp';
     if ((def.dmg || 0) >= 45) return 'heavy';
@@ -851,8 +850,9 @@
     return '';
   }
 
-  /* v5: gun2 = サブの銃、slot = いま えらんでいる わく（0 = メイン / 1 = サブ） */
-  const sel = { gun: '', bomb: '', gun2: '', slot: 0 };
+  /* v5: gun2 = サブの銃、slot = いま えらんでいる わく（0 = メイン / 1 = サブ）。CS2: gm / gm2 = 部品 */
+  const sel = { gun: '', bomb: '', gun2: '', slot: 0, gm: '', gm2: '' };
+  const cleanMods = (str, id) => (CS.Parts && id && id !== 'random' ? CS.Parts.clean(str || '', gunDef(id)) : '');
   const gunNodes = {}, bombNodes = {};
   let mapsBuilt = false, gunsBuilt = false, bombsBuilt = false, loadoutReturn = 'scTitle';
   /* だれのぶきをえらんでいるか: 'me'（じぶん）/ 'enemy'（てきのCPU）/ 'ally'（なかまのCPU）。
@@ -929,7 +929,7 @@
     const top = mk('div', 'top');
     const svg = gunSvg(def);
     if (svg) { const holder = mk('span'); holder.innerHTML = svg; top.appendChild(holder); }
-    top.appendChild(mk('span', 'tag', TYPE_TAG[def.type] || 'じゅう'));
+    top.appendChild(mk('span', 'tag', typeTag(def)));
     card.appendChild(top);
     card.appendChild(mk('span', 'wn', def.name || def.id));
     card.appendChild(mk('span', 'wd', def.desc || ''));
@@ -938,12 +938,21 @@
     gunNodes[def.id] = card;
     card.addEventListener('click', function () {
       audioWake(); sfx('click');
-      /* v5: じぶんの ぶき: 「サブ」の わくを えらんでいれば サブに。メインと おなじ銃なら 入れかえ */
-      if (loadoutTarget === 'me' && sel.slot === 1) {
-        if (def.id === sel.gun) { sel.gun = sel.gun2; sel.gun2 = def.id; }
-        else sel.gun2 = def.id;
-      } else if (loadoutTarget === 'me' && def.id === sel.gun2) { sel.gun2 = sel.gun; sel.gun = def.id; }
-      else sel.gun = def.id;
+      /* v5: じぶんの ぶき: 「サブ」の わくを えらんでいれば サブに。
+         CS2: おなじ銃を 2つ もてる。スナイパー系（solo）を もつと 2つめは もてない。部品は つけられる ものだけ のこす */
+      if (loadoutTarget !== 'me') sel.gun = def.id;
+      else if (sel.slot === 1) {
+        const main = gunDef(sel.gun);
+        if (def.solo) {
+          sel.gun = def.id; sel.gm = cleanMods(sel.gm, def.id); sel.gun2 = ''; sel.gm2 = ''; sel.slot = 0;
+          toast('スナイパー系は 1つだけ。メインに して サブを はずしたよ');
+        } else if (main && main.solo) {
+          toast('スナイパー系を もっているので 2つめの 銃は もてないよ');
+        } else { sel.gun2 = def.id; sel.gm2 = cleanMods(sel.gm2, def.id); }
+      } else {
+        sel.gun = def.id; sel.gm = cleanMods(sel.gm, def.id);
+        if (def.solo && sel.gun2) { sel.gun2 = ''; sel.gm2 = ''; toast('スナイパー系なので サブの 銃は はずしたよ'); }
+      }
       refreshLoadoutSel();
     });
     return card;
@@ -1005,18 +1014,20 @@
     const me = loadoutTarget === 'me';
     for (const id in gunNodes) {
       gunNodes[id].classList.toggle('sel', id === sel.gun);
-      gunNodes[id].classList.toggle('sel2', me && !!sel.gun2 && id === sel.gun2 && id !== sel.gun);
+      gunNodes[id].classList.toggle('sel2', me && !!sel.gun2 && id === sel.gun2);
     }
     for (const id in bombNodes) bombNodes[id].classList.toggle('sel', id === sel.bomb);
     /* v5: メイン・サブの わく */
     const slots = qsa(pick('scLoadout'), '.gunSlots .slot');
     for (let i = 0; i < slots.length; i++) slots[i].classList.toggle('sel', (+slots[i].getAttribute('data-slot')) === sel.slot);
-    setText(pick('slotName0'), gunName(sel.gun));
-    setText(pick('slotName1'), sel.gun2 ? gunName(sel.gun2) : 'なし');
+    const pn = (m) => { const n = CS.Parts ? CS.Parts.total(m || '') : 0; return n ? ' ＋' + n : ''; };
+    setText(pick('slotName0'), gunName(sel.gun) + (me ? pn(sel.gm) : ''));
+    const m0 = gunDef(sel.gun);
+    setText(pick('slotName1'), sel.gun2 ? gunName(sel.gun2) + pn(sel.gm2) : (m0 && m0.solo && me ? 'もてない（スナイパー系）' : 'なし'));
     const sum = pick('loadoutSum');
     clear(sum);
     if (sel.gun) {
-      sum.appendChild(mk('b', null, gunName(sel.gun) + (me && sel.gun2 && sel.gun2 !== sel.gun ? ' / ' + gunName(sel.gun2) : '')));
+      sum.appendChild(mk('b', null, gunName(sel.gun) + (me ? pn(sel.gm) : '') + (me && sel.gun2 ? ' / ' + gunName(sel.gun2) + pn(sel.gm2) : '')));
       sum.appendChild(D.createTextNode(' ＋ '));
       sum.appendChild(mk('i', null, bombName(sel.bomb)));
       sum.appendChild(mk('br'));
@@ -1025,16 +1036,18 @@
     } else {
       sum.appendChild(D.createTextNode('ぶきをえらんでね'));
     }
+    if (CS.Workshop && CS.Workshop.refresh) { try { CS.Workshop.refresh(); } catch (e) { if (window.console) console.error('[workshop]', e); } }
   }
 
-  /* v5: サブの銃（ない・メインと おなじ・必殺技の銃 なら ''） */
+  /* v5: サブの銃（ない・必殺技の銃 なら ''）。CS2: メインと おなじでも よい。スナイパー系が あれば '' */
   function validGun2(id, main) {
-    const g = CS.GunMap && CS.GunMap[id];
-    return g && !g.special && id !== main ? id : '';
+    const g = CS.GunMap && CS.GunMap[id], m = CS.GunMap && CS.GunMap[main];
+    return g && !g.special && !g.solo && !(m && m.solo) ? id : '';
   }
   function setLoadoutLabel() {
     const g1 = validGun(CS.Settings.gun), g2 = validGun2(CS.Settings.gun2, g1);
-    const t = gunName(g1) + (g2 ? ' / ' + gunName(g2) : '') + ' ＋ ' + bombName(validBomb(CS.Settings.bomb));
+    const pn = (m, id) => { const n = CS.Parts ? CS.Parts.total(cleanMods(m, id)) : 0; return n ? '＋' + n : ''; };
+    const t = gunName(g1) + pn(CS.Settings.gm, g1) + (g2 ? ' / ' + gunName(g2) + pn(CS.Settings.gm2, g2) : '') + ' ＋ ' + bombName(validBomb(CS.Settings.bomb));
     setText(pick('loadoutLabel'), t);
     setText(pick('cpuGearLabel'), t);          // コンピューター戦の画面にも同じものを出す
   }
@@ -1067,6 +1080,8 @@
       sel.gun = validGun(CS.Settings.gun);
       sel.bomb = validBomb(CS.Settings.bomb);
       sel.gun2 = validGun2(CS.Settings.gun2, sel.gun);
+      sel.gm = cleanMods(CS.Settings.gm, sel.gun);
+      sel.gm2 = sel.gun2 ? cleanMods(CS.Settings.gm2, sel.gun2) : '';
     }
     sel.slot = 0;
     pick('scLoadout').classList.toggle('cpuPick', cpu);
@@ -2034,9 +2049,11 @@
       if (sel.gun && sel.gun !== RND) CS.Settings.gun = sel.gun;
       if (sel.bomb && sel.bomb !== RND) CS.Settings.bomb = sel.bomb;
       CS.Settings.gun2 = validGun2(sel.gun2, CS.Settings.gun);
+      CS.Settings.gm = cleanMods(sel.gm, CS.Settings.gun);
+      CS.Settings.gm2 = CS.Settings.gun2 ? cleanMods(sel.gm2, CS.Settings.gun2) : '';
       if (CS.saveSettings) CS.saveSettings();
       setLoadoutLabel();
-      call('loadoutSaved', CS.Settings.gun, CS.Settings.bomb, CS.Settings.gun2);
+      call('loadoutSaved', CS.Settings.gun, CS.Settings.bomb, CS.Settings.gun2, CS.Settings.gm, CS.Settings.gm2);
       show(loadoutReturn);
     }, 'ok');
     /* v5: メイン・サブの わく */
@@ -2272,6 +2289,11 @@
     msg: msg,
     openLoadout: openLoadout,
     setLoadoutLabel: setLoadoutLabel,
+    /* CS2: 武器こうぼう（workshop.js）から: いま えらんでいる ぶき・部品 */
+    loadoutSel: sel,
+    get loadoutTarget() { return loadoutTarget; },
+    refreshLoadout: function () { refreshLoadoutSel(); },
+    gunName: gunName,
     renderLobby: renderLobby,
     showResult: showResult,
     setPractice: setPractice,

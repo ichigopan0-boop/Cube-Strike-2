@@ -213,6 +213,8 @@ select{font-family:inherit;font-size:15px;padding:9px 12px;border-radius:10px;mi
 #scLoadout.cpuPick #gunGrid .wcard.sel::after{content:"✓ えらんだ"}
 #gunGrid .wcard.sel2{border-color:#ffd28a;box-shadow:0 0 0 2px rgba(255,210,138,.45)}
 #gunGrid .wcard.sel2::after{content:"✓ サブ";position:absolute;right:8px;bottom:8px;font-size:10.5px;font-weight:700;color:#04060f;background:#ffd28a;border-radius:12px;padding:2px 8px}
+#gunGrid .wcard.sel.sel2::after{content:"✓ メイン＋サブ";background:linear-gradient(90deg,var(--cyan),#ffd28a)}
+#scLoadout.cpuPick #partsSec,#scLoadout.cpuPick #presetSec,#scLoadout.cpuPick .lnav [data-jump=partsSec],#scLoadout.cpuPick .lnav [data-jump=presetSec]{display:none}
 /* CPU のぶきをえらぶときだけ「おまかせ（ランダム）」のカードを出す */
 .rndOnly{display:none!important}
 #scLoadout.cpuPick .rndOnly{display:flex!important}
@@ -1055,12 +1057,14 @@ body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
   <div class="panel wide">
     <h2 id="loadoutTitle">ぶきをえらぶ</h2>
     <div class="note" id="loadoutNote">しあい中は武器を変えられません</div>
-    <div class="lnav"><button class="btn ghost" type="button" data-jump="gunSec">じゅう（21）</button><button class="btn ghost" type="button" data-jump="bombSec">ボム（8）</button></div>
+    <div class="lnav"><button class="btn ghost" type="button" data-jump="partsSec">部品</button><button class="btn ghost" type="button" data-jump="presetSec">組み合わせ</button><button class="btn ghost" type="button" data-jump="gunSec">じゅう（57）</button><button class="btn ghost" type="button" data-jump="bombSec">ボム（8）</button></div>
     <div id="gunSlots" class="gunSlots">
       <button type="button" class="btn slot sel" data-slot="0"><small>メイン（1）</small><b id="slotName0">-</b></button>
       <button type="button" class="btn slot" data-slot="1"><small>サブ（2）</small><b id="slotName1">-</b></button>
-      <p class="hint">銃は 2つ もてる。上で「メイン」か「サブ」を えらんでから 下の銃を おしてね。しあい中は X キー・マウスホイール・「切替」ボタンで もちかえ</p>
+      <p class="hint">銃は 2つ もてる（おなじ銃を 2つでも OK）。上で「メイン」か「サブ」を えらんでから 下の銃を おしてね。<b>スナイパー系</b>を もつと 銃は 1つだけ。しあい中は X キー・マウスホイール・「切替」ボタンで もちかえ</p>
     </div>
+    <div id="partsSec" class="grp"></div>
+    <div id="presetSec" class="grp"></div>
     <div id="gunSec" class="grp"><div id="gunGrid"></div></div>
     <div id="bombSec" class="grp bombs"><h3>ボム<span>1つえらぶ（しあい中に回復して何回も使える）</span></h3><div id="bombGrid" class="cgrid"></div></div>
     <div class="lfoot">
@@ -1535,6 +1539,7 @@ body.touch.editing #edBar{bottom:auto;top:calc(60px + var(--safeT))}
 <script src="js/ui-extra.js?v=20"></script>
 <script src="js/stages-ui.js?v=20"></script>
 <script src="js/skin-ui.js?v=20"></script>
+<script src="js/workshop.js?v=20"></script>
 <script src="js/specials.js?v=20"></script>
 <script src="js/game.js?v=20"></script>
 <script src="js/tower.js?v=20"></script>

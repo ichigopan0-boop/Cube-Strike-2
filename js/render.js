@@ -1219,6 +1219,17 @@
       }
     }
 
+    /* CS2: 銃だけを かく（武器こうぼうの プレビュー）。pos = 銃の まんなか */
+    gunModel(gun, pos, yaw, pitch, sc) {
+      if (!this.ok) return;
+      gun = this._resolveGun(gun);
+      const info = this._gunInfo(gun);
+      sc = sc > 0 ? sc : 1;
+      const G = poseMatrix(this._G, pos[0], pos[1], pos[2], yaw || 0, pitch || 0, 0, sc, info.cx, info.cy, info.cz);
+      const gs = CS.GunSkins ? CS.GunSkins.get(CS.GunSkins.mineId()) : null;
+      this._drawGunBoxes(G, info, this.opaque, 1, 0, 0.06, 0, 0, sc, gs);
+    }
+
     /* ---------- 自分の銃 ---------- */
     viewModel(gun, s) {
       if (!this.ok) return;
