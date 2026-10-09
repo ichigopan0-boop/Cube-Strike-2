@@ -222,6 +222,14 @@
     },
     /* CS2: ホストだけ: 城バトルの へやの せってい */
     roomCastle: function (cfg) { game.setRoomCastle(cfg); },
+    /* CS2: ストーリーの ステージ。opt = {ch, st, hard} */
+    story: function (opt) {
+      CS.Audio.init();
+      joinPending = createPending = false;
+      menuOpen = false;
+      if (!CS.Story || !CS.Story.start(game, opt || {})) { CS.UI.toast('いま ストーリーを はじめられません'); return; }
+      startPlay();
+    },
     /* 塔のぼり。opt = {diff} */
     tower: function (opt) {
       CS.Audio.init();

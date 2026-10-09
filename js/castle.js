@@ -26,16 +26,18 @@
   /* ---------- 大きさ・きまり ---------- */
   const MW = 104, MH = 22, MD = 52;          // マップ（ボクセル）
   const MAX_N = 4;                           // 1チーム 4人まで（たりない ところは CPU）
-  const POOL = 10;                           // 部隊の 入れもの（1チーム）
-  const MAX_UNITS = 8, MAX_TURRETS = 3;      // いちどに いられる 部隊・砲台
+  const POOL = 12;                           // 部隊の 入れもの（1チーム）
+  const MAX_UNITS = 10, MAX_TURRETS = 3;     // いちどに いられる 部隊・砲台
   const CAP_T = 10, CAP_R = 3.6, CAP_H = 3.2; // 基地: 10秒で せんりょう・はんけい・たかさ
   const BUY_R = 4.8;                         // 基地で 買える はんけい
-  const BLOCK_HP = 45;                       // 城の ブロック 1こ の HP
-  const FALL_K = 0.35;                       // ブロックが これだけ こわれたら 城が くずれる
+  const BLOCK_HP = 50;                       // 城の ブロック 1こ の HP
+  const FALL_K = 0.4;                        // ブロックが これだけ こわれたら 城が くずれる
   const START_MONEY = 300, MONEY_MAX = 99999;
   const INC_BASE = 3, INC_PER = 4;           // 1秒ごとの お金（いつも ＋ 基地 1つごと）
   const KILL_P = 40, KILL_U = 25;            // たおした お金（人・部隊）
-  const BULLET_K = 0.45, SPLASH_K = 1.2;     // 城への ダメージ（ふつうの弾・ばくはつ）
+  const BULLET_K = 1.0, SPLASH_K = 1.2;      // 城への ダメージ（ふつうの弾も ちゃんと こわれる・ばくはつ）
+  /* さいしょから 出ている 部隊（チームごと・ただ）: [しゅるい, 0 = 攻撃 / 1 = 守備] */
+  const START_UNITS = [['soldier', 0], ['soldier', 0], ['soldier', 1], ['sniper', 1]];
   const TIMES = [5, 10, 15, 0];
   const LVS = ['easy', 'normal', 'hard'];
   const LV_NAME = { easy: 'よわい', normal: 'ふつう', hard: 'つよい' };
@@ -63,11 +65,11 @@
 
   /* ---------- 部隊 ---------- */
   const UNITS = {
-    soldier: { id: 'soldier', name: 'ふつう兵', cost: 100, gun: 'ar', bomb: 'frag', hp: 200, dmg: 0.75, cs: 1, hat: 'cap', face: 1, desc: 'アサルトライフルで たたかう' },
-    sniper: { id: 'sniper', name: 'スナイパー兵', cost: 150, gun: 'sniper', bomb: 'smoke', hp: 150, dmg: 0.7, cs: 1, hat: 'antenna', face: 3, desc: 'とおくから ねらいうち' },
-    tank: { id: 'tank', name: 'タンク兵', cost: 300, gun: 'hmg', bomb: 'frag', hp: 750, dmg: 0.8, cs: 2.2, move: 0.72, hat: 'horn', pat: 'frame', face: 6, desc: 'おそいけど とても かたい。城に つよい' },
-    bomber: { id: 'bomber', name: 'ボム兵', cost: 200, gun: 'grenade', bomb: 'frag', hp: 180, dmg: 0.8, cs: 1.5, hat: 'tophat', face: 2, desc: 'グレネードと ボムで 城を こわす' },
-    healer: { id: 'healer', name: '回復兵', cost: 150, gun: 'pdw', bomb: 'smoke', hp: 180, dmg: 0.6, cs: 0.5, hat: 'halo', pat: 'cross', face: 4, heal: 14, desc: 'まわりの みかたを 回復する' },
+    soldier: { id: 'soldier', name: 'ふつう兵', cost: 100, gun: 'ar', bomb: 'frag', hp: 200, dmg: 0.75, cs: 0.6, hat: 'cap', face: 1, desc: 'アサルトライフルで たたかう' },
+    sniper: { id: 'sniper', name: 'スナイパー兵', cost: 150, gun: 'sniper', bomb: 'smoke', hp: 150, dmg: 0.7, cs: 0.6, hat: 'antenna', face: 3, desc: 'とおくから ねらいうち' },
+    tank: { id: 'tank', name: 'タンク兵', cost: 300, gun: 'hmg', bomb: 'frag', hp: 750, dmg: 0.8, cs: 1.6, move: 0.72, hat: 'horn', pat: 'frame', face: 6, desc: 'おそいけど とても かたい。城に つよい' },
+    bomber: { id: 'bomber', name: 'ボム兵', cost: 200, gun: 'grenade', bomb: 'frag', hp: 180, dmg: 0.8, cs: 1.0, hat: 'tophat', face: 2, desc: 'グレネードと ボムで 城を こわす' },
+    healer: { id: 'healer', name: '回復兵', cost: 150, gun: 'pdw', bomb: 'smoke', hp: 180, dmg: 0.6, cs: 0.3, hat: 'halo', pat: 'cross', face: 4, heal: 14, desc: 'まわりの みかたを 回復する' },
     turret: { id: 'turret', name: '砲台', cost: 250, gun: 'lmg', bomb: 'weak', hp: 450, dmg: 0.6, cs: 0, turret: true, desc: 'いま いる ところに おく。うごかずに 撃つ' }
   };
   const ITEMS = ['soldier', 'sniper', 'tank', 'bomber', 'healer', 'turret', 'repair'];
@@ -286,8 +288,8 @@
       over: false, endT: -1, winner: -1, why: '', ver: 0,
       incT: 0, statN: 0, outX: [], outR: [], flushT: 0, dmgOut: [], dmgT: 0, rl: {},
       meshDirty: false, meshT: 0, expDirty: [true, true], exp: [[], []], expT: [0, 0],
-      ai: [{ t: 6 }, { t: 6 }], humans: [0, 0], threat: [0, 0], threatT: 0, healT: 0, laneSeq: [0, 0], spotSeq: [0, 0],
-      shop: false, mode: 0, lostT: [-99, -99], fall: null, hudT: 0, gold: null, myTeam: 0, unitsHud: [0, 0]
+      ai: [{ t: 3 }, { t: 3 }], init: false, humans: [0, 0], threat: [0, 0], threatT: 0, healT: 0, laneSeq: [0, 0], spotSeq: [0, 0],
+      shop: true, mode: 0, lostT: [-99, -99], fall: null, hudT: 0, gold: null, myTeam: 0, unitsHud: [0, 0]
     };
     for (const p of this.players) {
       if (typeof p.id === 'string' && p.id.indexOf('cu') === 0) {
@@ -299,13 +301,12 @@
     this.timeLimit = cfg.time > 0 ? cfg.time * 60 : 0;
     this.timeLeft = this.timeLimit;
     this._csCleanup();
-    if (me) CS.UI.toast('あいての 城を こわせ！ 基地を とると お金が ふえる。城か 基地で B キー（かう ボタン）で 部隊を 買おう');
+    if (me) CS.UI.toast('あいての 城を こわせ！ 基地を とると お金が ふえる。城か 基地で 1〜7 キー（左の メニュー）で 部隊を 買おう');
   };
 
   G._csCleanup = function () {
     const sh = document.getElementById('csShop');
-    if (sh) sh.classList.remove('on');
-    if (this.castle) this.castle.shop = false;
+    if (sh) { sh.classList.toggle('on', !!(this.castle && !this.castle.over && this.mode === 'match')); sh._m = ''; }
   };
 
   /* ======================================================================
@@ -391,6 +392,9 @@
     if (!hit && !hitTarget && wv >= 0 && teamOfId(this.world.data[wv]) === 1 - owner.team) {
       const d = (g.dmg || 0) * BULLET_K * mul;
       if (d > 0) out.push(wv, r1(d));
+      /* こわれかけの かけら（見た目） */
+      const pal = this.mapData && this.mapData.palette, col = (pal && pal[this.world.data[wv]]) || [0.8, 0.8, 0.8];
+      for (let i = 0; i < 2; i++) this._addPart(pos[0], pos[1], pos[2], (rnd() - 0.5) * 3, rnd() * 3, (rnd() - 0.5) * 3, 0.07 + rnd() * 0.06, col[0], col[1], col[2], 0.6, 1, 0.4, 1);
     }
     if (pr.radius > 0 && pr.splashDmg > 0) this._csSphere(out, pos, pr.radius, pr.splashDmg * SPLASH_K * mul, pr.splashMin || 0.2, owner.team);
     if (out.length) this._csSend(p.owner, out);
@@ -504,6 +508,11 @@
       return;
     }
     if (this.phase !== 'live') return;
+    /* さいしょから 攻撃部隊・守備部隊が 出ている */
+    if (!cs.init) {
+      cs.init = true;
+      for (let t = 0; t < 2; t++) for (const s of START_UNITS) this._csDoBuy(t, s[0], s[1], { k: 'castle', b: -1 }, null, -2, true);
+    }
     this.matchTime += dt;
     if (this.timeLimit > 0) {
       this.timeLeft = Math.max(0, this.timeLimit - this.matchTime);
@@ -626,7 +635,7 @@
   };
 
   /* 買う（ホスト）。うまく いったら ''、だめなら りゆう */
-  G._csDoBuy = function (t, u, mode, zone, pos, by) {
+  G._csDoBuy = function (t, u, mode, zone, pos, by, free) {
     const cs = this.castle;
     if (!cs || cs.over) return 'over';
     if (this.phase !== 'live') return 'wait';
@@ -646,7 +655,7 @@
     let slot = null;
     for (const p of this.players) if (p.pool && p.team === t && !p.alive && p.connected && !(p.cs && p.cs.type)) { slot = p; break; }
     if (!slot) return 'full';
-    if (cs.money[t] < U.cost) return 'money';
+    if (!free && cs.money[t] < U.cost) return 'money';
     let at = null;
     if (U.turret) {
       at = this._csTurretSpot(t, pos);
@@ -658,10 +667,9 @@
       const s = UNIT_SPOTS[cs.spotSeq[t]++ % UNIT_SPOTS.length];
       at = [tx(t, s[0]), GY, tz(t, s[1])];
     }
-    cs.money[t] -= U.cost;
-    cs.bought[t]++;
+    if (!free) { cs.money[t] -= U.cost; cs.bought[t]++; }
     const lane = cs.laneSeq[t]++ % 3;
-    this._broadcast({ t: 'cev', k: 'u', i: slot.idx, u: u, m: mode ? 1 : 0, b: zone && zone.k === 'base' ? zone.b : -1, ln: lane, by: by });
+    this._broadcast({ t: 'cev', k: 'u', i: slot.idx, u: u, m: mode ? 1 : 0, b: zone && zone.k === 'base' ? zone.b : -1, ln: lane, by: free ? -2 : by });
     this._hostRespawn(slot, { p: at, yaw: t ? Math.PI / 2 : -Math.PI / 2 });
     slot.protectUntil = this.time + 1;
     return '';
@@ -962,17 +970,17 @@
     const cs = this.castle;
     if (!cs) return;
     const me = this.players[this.me];
-    /* キー: B = 買いもの / 1〜7 = 買う / V = 攻撃・守備 */
+    /* キー: 1〜7 = 買う / V = 攻撃・守備（買いものの メニューは いつも 出ている。銃の もちかえは X・ホイール） */
     const ks = inp && inp.keys;
     if (ks && ks.length && me && this.phase !== 'over') {
       for (let i = 0; i < ks.length; i++) {
         const c = ks[i];
-        if (c === 'KeyB') this._csShop(!cs.shop);
-        else if (cs.shop && c === 'KeyV') this._csMode(1 - cs.mode);
-        else if (cs.shop && /^Digit[1-7]$/.test(c)) this._csBuy(ITEMS[(c.charCodeAt(5) - 49)]);
+        if (c === 'KeyV') this._csMode(1 - cs.mode);
+        else if (/^Digit[1-7]$/.test(c)) this._csBuy(ITEMS[(c.charCodeAt(5) - 49)]);
       }
     }
-    if (cs.shop && (!me || !me.alive || this.phase === 'over')) this._csShop(false);
+    const shEl = document.getElementById('csShop');
+    if (shEl) shEl.classList.toggle('on', this.phase !== 'over' && !cs.over);
     /* ゲスト: ブロックの ダメージを ホストへ */
     if (!this.isHost && cs.dmgOut.length) {
       cs.dmgT -= dt;
@@ -1005,17 +1013,8 @@
     }
   };
 
-  G._csShop = function (on) {
-    const cs = this.castle;
-    if (!cs) return;
-    const me = this.players[this.me];
-    if (on && (!me || !me.alive)) { CS.UI.hud.center(WHY.dead, '#ffb3c0', 900); return; }
-    cs.shop = !!on;
-    const el = document.getElementById('csShop');
-    if (el) el.classList.toggle('on', cs.shop);
-    cs.hudT = 0;
-    this._sfx(on ? 'click' : 'back', null, 0.6);
-  };
+  /* （CS2: 買いものの メニューは いつも 出ている） */
+  G._csShop = function () {};
   G._csMode = function (m) {
     const cs = this.castle;
     if (!cs) return;
@@ -1293,12 +1292,11 @@
     const ie = $('csInfo');
     if (ie && ie._m !== info) { ie._m = info; ie.innerHTML = info; ie.style.display = info ? '' : 'none'; }
     const zone = me && me.alive ? this._csZoneOf(myT, me.pos) : null;
-    const bb = $('csBuyBtn');
-    if (bb) { bb.classList.toggle('on', !!zone || cs.shop); bb.textContent = cs.shop ? 'とじる (B)' : 'かう (B)'; }
-    /* 買いもの */
+    /* 買いもの（いつも 出ている） */
     const sh = $('csShop');
-    if (sh && cs.shop) {
-      const sig = [Math.floor(cs.money[myT]), cs.mode, zone ? 1 : 0, cnt.units, cnt.turrets].join('|');
+    if (sh) {
+      const alive = !!(me && me.alive);
+      const sig = [Math.floor(cs.money[myT]), cs.mode, zone ? (zone.k + zone.b) : 0, cnt.units, cnt.turrets, alive ? 1 : 0].join('|');
       if (sh._m !== sig) {
         sh._m = sig;
         const it = sh.querySelectorAll('.csIt');
@@ -1310,7 +1308,8 @@
         const md = $('csModeBtn');
         if (md) { md.textContent = cs.mode ? '守備部隊（その場を まもる）' : '攻撃部隊（あいての 城へ）'; md.classList.toggle('def', !!cs.mode); }
         const zs = $('csShopZone');
-        if (zs) zs.textContent = zone ? (zone.k === 'castle' ? 'じぶんの 城で 買う → 部隊は 城から 出る' : '基地 ' + BASES[zone.b].n + ' で 買う → 部隊は ここから 出る') : 'ここでは 買えない（じぶんの 城か、とった 基地へ）';
+        if (zs) zs.textContent = !alive ? 'ふっかつ したら 買えるよ' : zone ? (zone.k === 'castle' ? 'じぶんの 城 → 部隊は 城から 出る' : '基地 ' + BASES[zone.b].n + ' → 部隊は ここから 出る') : 'ここでは 買えない（じぶんの 城か、とった 基地で）';
+        sh.classList.toggle('far', !zone || !alive);
       }
     }
   };
@@ -1373,23 +1372,21 @@
     '#csMoney b{font-size:17px}#csMoney small{font-size:11px;color:#cfe0a0}#csMoney span{font-size:11.5px;color:#cfe0f5}#csMoney em{font-style:normal;color:#8ff0c8;font-weight:900}',
     '#csInfo{position:absolute;top:100px;left:50%;transform:translateX(-50%);font-size:13px;color:#fff;background:rgba(8,12,24,.55);border-radius:10px;padding:3px 12px;white-space:nowrap}',
     '#csInfo .warn{color:#ff9aa4;animation:csHit .3s infinite alternate}',
-    '#csBuyBtn{position:absolute;right:14px;top:42%;pointer-events:auto;display:none;min-width:86px;min-height:44px;border-radius:12px;font:inherit;font-weight:900;font-size:14px;',
-    '  color:#1a1206;background:linear-gradient(#ffe08a,#ffc24a);border:2px solid #fff3c4;cursor:pointer;z-index:5}',
-    '#csBuyBtn.on{display:block}',
-    '#csShop{position:absolute;left:14px;top:120px;width:min(330px,calc(100vw - 28px));display:none;pointer-events:auto;z-index:6;',
-    '  background:rgba(8,12,24,.86);border:1px solid rgba(255,224,138,.45);border-radius:14px;padding:10px;color:#eaf4ff}',
-    '#csShop.on{display:block}',
-    '#csShop h4{margin:0 0 6px;font-size:14px;color:#ffe08a;display:flex;justify-content:space-between}',
-    '#csShop h4 small{color:#9fb4d4;font-weight:400}',
-    '#csModeBtn{width:100%;margin-bottom:6px;min-height:34px;border-radius:9px;font:inherit;font-size:12.5px;font-weight:900;cursor:pointer;color:#fff;background:#b8324a;border:1px solid #ff9aa4}',
+    '#csBuyBtn{display:none}',
+    '#csShop{position:absolute;left:12px;top:132px;width:228px;display:none;pointer-events:auto;z-index:6;',
+    '  background:rgba(8,12,24,.72);border:1px solid rgba(255,224,138,.45);border-radius:12px;padding:7px;color:#eaf4ff}',
+    '#csShop.on{display:block}#csShop.far{opacity:.62}',
+    '#csShop h4{margin:0 0 5px;font-size:12.5px;color:#ffe08a;display:flex;justify-content:space-between;align-items:baseline}',
+    '#csShop h4 small{color:#9fb4d4;font-weight:400;font-size:10.5px}',
+    '#csModeBtn{width:100%;margin-bottom:4px;min-height:28px;border-radius:8px;font:inherit;font-size:11.5px;font-weight:900;cursor:pointer;color:#fff;background:#b8324a;border:1px solid #ff9aa4}',
     '#csModeBtn.def{background:#2b5fb8;border-color:#9cc3ff}',
-    '.csIt{display:grid;grid-template-columns:22px 1fr auto;gap:2px 8px;align-items:center;width:100%;margin:3px 0;padding:5px 8px;border-radius:9px;font:inherit;color:#eaf4ff;text-align:left;cursor:pointer;',
+    '.csIt{display:grid;grid-template-columns:16px 1fr auto;gap:0 6px;align-items:center;width:100%;margin:2px 0;padding:3px 7px;border-radius:8px;font:inherit;color:#eaf4ff;text-align:left;cursor:pointer;',
     '  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}',
-    '.csIt kbd{font:inherit;font-weight:900;color:#ffe08a}.csIt b{font-size:13px}.csIt i{font-style:normal;color:#ffe08a;font-weight:900;font-size:13px}',
-    '.csIt small{grid-column:2/4;font-size:10.5px;color:#9fb4d4}',
+    '.csIt kbd{font:inherit;font-weight:900;color:#ffe08a;font-size:12px}.csIt b{font-size:12px}.csIt i{font-style:normal;color:#ffe08a;font-weight:900;font-size:12px}',
+    '.csIt small{display:none}',
     '.csIt.ng{opacity:.45}',
-    '#csShopZone{font-size:11px;color:#cfe0f5;margin-top:4px}',
-    '@media (max-width:640px){#csMoney{top:62px}#csInfo{top:94px;font-size:12px}#csShop{top:auto;bottom:120px}}'
+    '#csShopZone{font-size:10.5px;color:#cfe0f5;margin-top:3px;line-height:1.35}',
+    '@media (max-width:640px),(max-height:500px){#csMoney{top:62px}#csInfo{top:94px;font-size:12px}#csShop{top:118px;width:190px;transform:scale(.88);transform-origin:left top}}'
   ].join('\n');
 
   function buildScreens() {
@@ -1404,7 +1401,8 @@
       '<div id="csRules">' +
       '<div>・城は <b>ブロック</b>で できている。撃つと こわれて、ゲージが 0 に なると 城が くずれる（ボム・ロケットが よく きく）</div>' +
       '<div>・まんなかの <b>基地 5つ</b>は <b>10秒 立つと せんりょう</b>。基地が 多いほど <b>チームの お金</b>が ふえる（時間・たおしても ふえる）</div>' +
-      '<div>・じぶんの 城か、とった 基地の 中で <b>B キー</b>（スマホは かう ボタン）。<b>1〜7</b> で 買う・<b>V</b> で 攻撃⇔守備</div>' +
+      '<div>・じぶんの 城か、とった 基地の 中で <b>1〜7 キー</b>で 買う（左に いつも メニューが 出ている・スマホは メニューを タップ）。<b>V</b> で 攻撃⇔守備。銃の もちかえは <b>X</b></div>' +
+      '<div>・さいしょから 攻撃部隊 2たい・守備部隊 2たいが 出ている（あいても おなじ）</div>' +
       '<div>・部隊: ふつう兵 / スナイパー兵 / タンク兵 / ボム兵 / 回復兵 / 砲台 ・ 城の しゅうりも できる</div>' +
       '</div>' +
       '<h3>人数（1チーム）</h3><div id="csN"></div>' +
@@ -1450,7 +1448,7 @@
     /* HUD（しあい中） */
     const hud = $('hud');
     if (hud && !$('csUi')) {
-      let shop = '<h4>部隊を 買う <small>1〜7 で 買う ・ B で とじる</small></h4><button id="csModeBtn" type="button"></button>';
+      let shop = '<h4>部隊を 買う <small>1〜7 で 買う ・ V で きりかえ</small></h4><button id="csModeBtn" type="button"></button>';
       ITEMS.forEach((id, i) => {
         const it = itemOf(id);
         shop += '<button class="csIt" type="button" data-u="' + id + '"><kbd>' + (i + 1) + '</kbd><b>' + esc(it.name) + '</b><i>' + it.cost + 'G</i><small>' + esc(it.desc) + '</small></button>';
@@ -1466,7 +1464,6 @@
         '<div id="csShop">' + shop + '</div>' +
         '</div>');
       const game = () => CS.debug && CS.debug.game;
-      $('csBuyBtn').addEventListener('click', (e) => { e.stopPropagation(); const g = game(); if (g && g.castle) g._csShop(!g.castle.shop); });
       $('csModeBtn').addEventListener('click', (e) => { e.stopPropagation(); const g = game(); if (g && g.castle) g._csMode(1 - g.castle.mode); });
       $('csShop').querySelectorAll('.csIt').forEach((el) => {
         el.addEventListener('click', (e) => { e.stopPropagation(); const g = game(); if (g && g.castle) g._csBuy(el.getAttribute('data-u')); });
