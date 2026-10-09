@@ -136,6 +136,12 @@
         st.mapName = 'ボスレイド ' + CS.Raid.bossOf(r.boss).name;
         delete st.rule;
       }
+      /* CS2: 城バトル */
+      if (room.mode === 'castle' && CS.Castle) {
+        const c = CS.Castle.cleanCfg(room.castle);
+        st.mapName = '城バトル ' + c.n + '対' + c.n;
+        delete st.rule;
+      }
       /* v5: みんなで クリスタルまもり */
       if (room.mode === 'defense') {
         const DF = CS.Defense, d = room.defense;
@@ -206,6 +212,16 @@
     },
     /* CS2: ホストだけ: ボスレイドの へやの せってい */
     roomRaid: function (cfg) { game.setRoomRaid(cfg); },
+    /* CS2: 城バトル（じぶん＋なかまの CPU vs CPU）。opt = {n, time, lv} */
+    castle: function (opt) {
+      CS.Audio.init();
+      joinPending = createPending = false;
+      menuOpen = false;
+      if (!game.startCastle || !game.startCastle(opt || {})) { CS.UI.toast('いま 城バトルを はじめられません'); return; }
+      startPlay();
+    },
+    /* CS2: ホストだけ: 城バトルの へやの せってい */
+    roomCastle: function (cfg) { game.setRoomCastle(cfg); },
     /* 塔のぼり。opt = {diff} */
     tower: function (opt) {
       CS.Audio.init();

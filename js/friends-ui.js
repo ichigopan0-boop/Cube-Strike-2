@@ -57,6 +57,7 @@
     if (g.room.mode === 'defense') return { room: g.room.code, mode: 'defense', mapName: defLabel(g.room) };
     if (g.room.mode === 'tourney') return { room: g.room.code, mode: 'tourney', mapName: g.room.tourney ? g.room.tourney.n + '人' : '' };
     if (g.room.mode === 'raid' && CS.Raid) return { room: g.room.code, mode: 'raid', mapName: CS.Raid.bossOf(CS.Raid.cleanCfg(g.room.raid).boss).name };
+    if (g.room.mode === 'castle' && CS.Castle) { const c = CS.Castle.cleanCfg(g.room.castle); return { room: g.room.code, mode: 'castle', mapName: c.n + '対' + c.n }; }
     return { room: g.room.code, mode: g.room.mode, mapName: v.mapName || '', rule: g.room.rule };
   }
   function towerLabel(room) {
@@ -67,7 +68,7 @@
     const DF = CS.Defense, d = room && room.defense;
     return 'むずかしさ ' + (DF && d ? DF.diffOf(d.diff).name : 'ふつう');
   }
-  function modeText(m) { return m === 'tower' ? 'みんなで塔のぼり' : m === 'defense' ? 'みんなで クリスタルまもり' : m === 'tourney' ? 'みんなで トーナメント' : m === 'raid' ? 'みんなで ボスレイド' : m ? m.replace('v', '対') : ''; }
+  function modeText(m) { return m === 'tower' ? 'みんなで塔のぼり' : m === 'defense' ? 'みんなで クリスタルまもり' : m === 'tourney' ? 'みんなで トーナメント' : m === 'raid' ? 'みんなで ボスレイド' : m === 'castle' ? '城バトル' : m ? m.replace('v', '対') : ''; }
 
   /* ---------------- 描く（まとめて） ---------------- */
   function renderSoon() {
@@ -112,7 +113,7 @@
         const row = mk('div', 'frRow');
         const who = mk('div', 'frWho');
         who.appendChild(mk('b', null, '' + (inv.name || fc(inv.code)) + ' から さそい'));
-        who.appendChild(mk('small', null, [modeText(inv.mode), inv.mapName || '', inv.rule && inv.mode !== 'tower' && inv.mode !== 'defense' && inv.mode !== 'tourney' && inv.mode !== 'raid' ? U.ruleText(inv.rule) : ''].filter(Boolean).join(' ・ ')));
+        who.appendChild(mk('small', null, [modeText(inv.mode), inv.mapName || '', inv.rule && inv.mode !== 'tower' && inv.mode !== 'defense' && inv.mode !== 'tourney' && inv.mode !== 'raid' && inv.mode !== 'castle' ? U.ruleText(inv.rule) : ''].filter(Boolean).join(' ・ ')));
         row.appendChild(who);
         row.appendChild(button('参加する', 'pink sm', function () { joinInvite(inv); }, 'ok'));
         row.appendChild(button('けす', 'ghost sm', function () { hub.dropInvite(inv); }, 'back'));

@@ -1237,10 +1237,17 @@
   function nameOfGun(id) { const g = CS.GunMap && CS.GunMap[id]; return g ? (g.short || g.name) : (id || '—'); }
   function nameOfBomb(id) { const b = CS.BombMap && CS.BombMap[id]; return b ? b.name : (id || '—'); }
 
-  const MODE_PER = { '1v1': 1, '2v2': 2, '3v3': 3, 'tower': 4, 'defense': 4, 'tourney': 8, 'raid': 4 };
+  const MODE_PER = { '1v1': 1, '2v2': 2, '3v3': 3, 'tower': 4, 'defense': 4, 'tourney': 8, 'raid': 4, 'castle': 4 };
   function perTeam(mode) { return MODE_PER[mode] || 1; }
   function modeLabel(mode) {
-    return mode === 'tower' ? 'みんなで塔のぼり' : mode === 'defense' ? 'みんなで クリスタルまもり' : mode === 'tourney' ? 'みんなで トーナメント' : mode === 'raid' ? 'みんなで ボスレイド' : perTeam(mode) + '対' + perTeam(mode);
+    return mode === 'tower' ? 'みんなで塔のぼり' : mode === 'defense' ? 'みんなで クリスタルまもり' : mode === 'tourney' ? 'みんなで トーナメント' : mode === 'raid' ? 'みんなで ボスレイド' : mode === 'castle' ? '城バトル' : perTeam(mode) + '対' + perTeam(mode);
+  }
+  /* CS2: 城バトルの へやの せってい */
+  function castleText(o) {
+    const C = CS.Castle, c = o && o.castle;
+    if (!C || !c) return '';
+    const k = C.cleanCfg(c);
+    return k.n + '対' + k.n + ' ・ 時間 ' + C.timeName(k.time) + ' ・ CPU ' + C.LV_NAME[k.lv];
   }
   function raidText(o) {
     const R = CS.Raid, r = o && o.raid;
@@ -1306,12 +1313,12 @@
     lobbyCode = code;
 
     const per = perTeam(o.mode);
-    const defense = o.mode === 'defense', tourney = o.mode === 'tourney', raid = o.mode === 'raid';
+    const defense = o.mode === 'defense', tourney = o.mode === 'tourney', raid = o.mode === 'raid', castle = o.mode === 'castle';
     const tower = o.mode === 'tower' || defense || tourney || raid;      // みんなで（塔のぼり・クリスタルまもり・トーナメント・ボスレイド）: 1つの ならび
     const mapDef = (CS.Maps && CS.Maps.get) ? CS.Maps.get(o.mapId) : null;
     const mapName = o.mapName || (mapDef && mapDef.name) || o.mapId || 'マップ';
-    const rt = tourney ? (CS.Tourney ? CS.Tourney.describe(o.tourney) : '') : raid ? raidText(o) : defense ? 'むずかしさ: ' + defDiffName(o) : tower ? 'むずかしさ: ' + towerDiffName(o) : ruleText(o.rule);
-    const where = tourney ? '8人まで' : defense ? defMapName(o) + ' ・ 4人まで' : tower ? '4人まで' : mapName;
+    const rt = castle ? castleText(o) : tourney ? (CS.Tourney ? CS.Tourney.describe(o.tourney) : '') : raid ? raidText(o) : defense ? 'むずかしさ: ' + defDiffName(o) : tower ? 'むずかしさ: ' + towerDiffName(o) : ruleText(o.rule);
+    const where = castle ? '城バトルの 草原' : tourney ? '8人まで' : defense ? defMapName(o) + ' ・ 4人まで' : tower ? '4人まで' : mapName;
     /* v5.3: ランダムマッチ（ルールは きまり・じゅんびは じどう・そろったら じどうで はじまる） */
     const ranked = !!o.ranked;
     const head = ranked ? 'ランダムマッチ ' + modeLabel(o.mode) + '（' + (CS.Ranked ? CS.Ranked.tierName(o.ranked.tier) : '') + '）' : modeLabel(o.mode);
@@ -1324,8 +1331,8 @@
       eInfo.appendChild(D.createTextNode(' ・ ' + where + ' ・ '));
       eInfo.appendChild(mk('span', 'ruleTag', rt));
     }
-    pick('btnLobbyRule').style.display = o.isHost && !tower && !ranked ? '' : 'none';
-    if (!o.isHost || tower || ranked) pick('lobbyRulePanel').classList.remove('on');
+    pick('btnLobbyRule').style.display = o.isHost && !tower && !ranked && !castle ? '' : 'none';
+    if (!o.isHost || tower || ranked || castle) pick('lobbyRulePanel').classList.remove('on');
     pick('btnReady').style.display = ranked ? 'none' : '';
     pick('team1').style.display = tower ? 'none' : '';
 
@@ -1417,7 +1424,9 @@
       bStart.disabled = !o.canStart;
       const sTxt = tourney ? (o.canStart ? 'トーナメント開始！' : 'ぜんいん じゅんびOK で はじめられます')
         : defense || raid ? (o.canStart ? 'スタート！' : 'ぜんいん じゅんびOK で はじめられます')
-        : tower ? (o.canStart ? 'のぼる！' : 'ぜんいん じゅんびOK で のぼれます') : (o.canStart ? 'しあい開始！' : 'ぜんいん そろうと押せます');
+        : tower ? (o.canStart ? 'のぼる！' : 'ぜんいん じゅんびOK で のぼれます')
+        : castle ? (o.canStart ? 'しあい開始！（あきは CPU）' : 'ぜんいん じゅんびOK で はじめられます')
+        : (o.canStart ? 'しあい開始！' : 'ぜんいん そろうと押せます');
       if (bStart._m !== sTxt) { bStart._m = sTxt; bStart.textContent = sTxt; }
     } else {
       bStart.style.display = 'none';
@@ -1429,6 +1438,10 @@
       if (ranked) {
         m = filled < per * 2 ? 'おなじ ランクの人を まっています（あと ' + (per * 2 - filled) + '人）。そろうと じどうで はじまるよ。'
           : 'そろった！ まもなく はじまります';
+      }
+      else if (castle) {
+        if (!o.isHost) m = 'ホストが「しあい開始！」を押すと はじまります。あいている ところには コンピューターが 入るよ。';
+        else m = 'コードを友達に送ろう（1チーム 4人まで）。チームを えらんで「じゅんびOK」。あきは コンピューターが 入ります。';
       }
       else if (tourney) {
         if (!o.isHost) m = 'ホストが「トーナメント開始！」を押すと 表が できます。足りない人数は コンピューターが 入るよ。';

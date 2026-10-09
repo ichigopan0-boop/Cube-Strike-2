@@ -77,13 +77,15 @@
   /* ---------- 人数 ---------- */
   /* v4: 'tower' = みんなで塔のぼり（あかチームだけ・4人まで。てきは ホストが動かす コンピューター） */
   /* v5.1: 'tourney' = みんなで トーナメント（8人まで。しあいは 1対1 を ひとつずつ。ほかの人は かんせん） */
-  const PER_TEAM = { '1v1': 1, '2v2': 2, '3v3': 3, 'tower': 4, 'defense': 4, 'tourney': 8, 'raid': 4 };
+  const PER_TEAM = { '1v1': 1, '2v2': 2, '3v3': 3, 'tower': 4, 'defense': 4, 'tourney': 8, 'raid': 4, 'castle': 4 };
   /* v5: みんなで あそぶ モード（ロビーでは みんな あかチーム） */
   const isCoopMode = (m) => m === 'tower' || m === 'defense' || m === 'tourney' || m === 'raid';
   const normMode = (m) => (PER_TEAM[m] ? m : '1v1');
   const perTeam = (m) => PER_TEAM[m] || 1;
   /* v5.1: しあいに でている人（コピーの いれもの・トーナメントの かんせんの人 は のぞく） */
   const inPlay = (p) => p.clone < 0 && !p.spec;
+  /* CS2: スコア表・けっかに 出す人（城バトルの 部隊は のぞく） */
+  const shown = (p) => inPlay(p) && !p.pool;
   /* v5.2: 銃のスキン「アイスバー」（弾が アイスバーに なる） */
   const iceBar = (p) => !!(p && p.skin && p.skin.g === 'icebar');
   const BOT_POSE_DT = 1 / 20;      // v4: ホストが動かす コンピューターの位置（みんなで塔のぼり）
@@ -448,6 +450,11 @@
         const S = CS.Settings;
         this.room.raid = CS.Raid.cleanCfg(opts.raid || { boss: S.raidBoss, diff: S.raidDiff, ally: S.raidAlly == null ? 0 : S.raidAlly });
       }
+      /* CS2: 城バトル（人数・時間・CPUの つよさは 作った人が きめる） */
+      if (this.matchMode === 'castle' && CS.Castle) {
+        const S = CS.Settings;
+        this.room.castle = CS.Castle.cleanCfg(opts.castle || { n: S.csN, time: S.csTime, lv: S.csLv });
+      }
       /* v5.1: みんなで トーナメント（人数・つよさ・ルール・マップは 作った人が きめる） */
       if (this.matchMode === 'tourney' && CS.Tourney) {
         const S = CS.Settings;
@@ -610,6 +617,15 @@
       return true;
     }
 
+    /* CS2: ホストだけ: 城バトルの へやの せってい（ロビーのあいだ） */
+    setRoomCastle(cfg) {
+      if (!this.isHost || !this.room || this.room.started || this.mode !== 'lobby' || this.room.mode !== 'castle' || !CS.Castle) return false;
+      this.room.castle = CS.Castle.cleanCfg(cfg);
+      for (const p of this.room.players) p.ready = false;
+      this._broadcastLobby();
+      return true;
+    }
+
     /* ホストだけ: へやのルール・マップを変える（ロビーのあいだ） */
     setRoomRule(rule, mapId) {
       if (!this.isHost || !this.room || this.room.started || this.mode !== 'lobby') return false;
@@ -633,6 +649,8 @@
       for (const p of this.room.players) { n[p.team]++; if (!p.ready) return false; }
       /* みんなで塔のぼり: 1人から（ぜんいん じゅんびOK なら） */
       if (isCoopMode(this.room.mode)) return n[0] >= 1 && n[1] === 0;
+      /* CS2: 城バトル: 1人から（あきは コンピューターが 入る） */
+      if (this.room.mode === 'castle') return n[0] + n[1] >= 1 && n[0] <= per && n[1] <= per;
       return n[0] === per && n[1] === per;
     }
 
@@ -650,6 +668,10 @@
       }
       if (room.mode === 'raid') {
         if (!this._raidStartCoop || !this._raidStartCoop()) { room.started = false; return false; }
+        return true;
+      }
+      if (room.mode === 'castle') {
+        if (!this._csStartRoom || !this._csStartRoom()) { room.started = false; return false; }
         return true;
       }
       /* v5.1: みんなで トーナメント: トーナメント表を 作って みんなへ（しあいは ホストが ひとつずつ はじめる） */
@@ -709,6 +731,8 @@
       if (m.mapDef && typeof m.mapDef.build === 'function') return m.mapDef;
       /* CS2: ボスレイドの アリーナ */
       if (m.raid && this._raidMapDef) { const d = this._raidMapDef(m.raid); if (d) return d; }
+      /* CS2: 城バトルの 草原 */
+      if (m.castle && this._csMapDef) { const d = this._csMapDef(m.castle); if (d) return d; }
       /* v4: 塔のぼりの階は みんなが 同じ種（seed・階・とびら）から 同じものを作る */
       if (m.tower && this._towerMapDef) { const d = this._towerMapDef(m.tower); if (d) return d; }
       const CM = CS.CustomMaps;
@@ -719,10 +743,10 @@
 
     /* ---- ルール ---- */
     _setRule(r) {
-      this.rule = r && (r.id === 'tower' || r.id === 'defense' || r.id === 'raid') ? { id: r.id, n: 0 } : CS.cleanRule(r);
+      this.rule = r && (r.id === 'tower' || r.id === 'defense' || r.id === 'raid' || r.id === 'castle') ? { id: r.id, n: 0 } : CS.cleanRule(r);
       const id = this.rule.id;
       this.killsToWin = id === 'kills' ? this.rule.n : Infinity;
-      this.timeLimit = id === 'tower' || id === 'defense' || id === 'raid' ? 0 : CS.ruleTime(this.rule);
+      this.timeLimit = id === 'tower' || id === 'defense' || id === 'raid' || id === 'castle' ? 0 : CS.ruleTime(this.rule);
       this.timeLeft = this.timeLimit;
       this.zone = id === 'area' ? this._makeZone() : null;
       this.zoneOwner = -1; this.zoneFight = false;
@@ -878,6 +902,10 @@
       /* CS2: ボスレイド: ボス・ザコの じゅんび */
       this.raid = null;
       if (m.raid && this.rule.id === 'raid' && this._raidSetup) this._raidSetup(m.raid);
+      /* CS2: 城バトル: 城の ブロック・基地・部隊の 入れもの */
+      this.castle = null;
+      if (this._csCleanup) this._csCleanup();
+      if (m.castle && this.rule.id === 'castle' && this._csSetup) this._csSetup(m.castle);
       /* いっしょに遊んだ人（フレンド申請できるように おぼえる。コンピューターはのぞく） */
       if (!this.offline) {
         const people = [];
@@ -1136,7 +1164,7 @@
       this.tower = null;
       this.hostBots = false;
       this.kings = null; this.kingWin = -1;
-      this.defense = null; this.tnMatch = null; this.raid = null;
+      this.defense = null; this.tnMatch = null; this.raid = null; this.castle = null;
       this.iceUntil[0] = this.iceUntil[1] = 0;
       if (this.renderer) this.renderer.ice = 0;
       try { CS.UI.hud.show(false); } catch (e) {}
@@ -2333,8 +2361,10 @@
                 continue;
               }
             }
-            if (p.mine) this._ownerDetonate(p, p.pos, null);
-            else if (this._plainFast(pr)) { this._sparks(p.pos[0], p.pos[1], p.pos[2], rc.n, p.gun.tracer, 3); p.dead = true; }
+            if (p.mine) {
+              if (this.castle && this._csRcVox) p.wv = this._csRcVox(rc);          // CS2: 城の ブロックに 当たった
+              this._ownerDetonate(p, p.pos, null);
+            } else if (this._plainFast(pr)) { this._sparks(p.pos[0], p.pos[1], p.pos[2], rc.n, p.gun.tracer, 3); p.dead = true; }
             else this._foreignStop(p);
             break;
           }
@@ -2571,6 +2601,8 @@
       /* 的（ばくはつ） */
       if (pr.radius > 0 && pr.splashDmg > 0 && this.targets.length && this._canHitTargets(p.owner)) this._targetsAt(pos, pr.radius, pr.splashDmg, pr.splashMin);
       this._claimHits(acc, g.id, 0, null, p.owner, this._slotOf(p.owner, g));
+      /* CS2: 城バトル: 城の ブロックへの ダメージ */
+      if (this.castle && this._csWall) this._csWall(p, pos, hit, hitTarget);
       /* ふつうの 速い弾は ほかの人の 画面でも じぶんで 止まるので 知らせない */
       if (!this._plainFast(pr)) this._sendOwner({ t: 'px', i: p.owner, id: p.id, p: [r2(pos[0]), r2(pos[1]), r2(pos[2])] });
       this._projBoom(p, pos, false);
@@ -2929,6 +2961,7 @@
         this._splash(acc, pos, radius, 0, 0, def.knock || 0, 0, b.owner);
       }
       this._claimHits(acc, wName, 0, pos, b.owner);
+      if (this.castle && this._csBlast && radius > 0 && dmg > 0) this._csBlast(b.owner, pos, radius, dmg, def.minMult || 0.2);     // CS2: 城バトル
       this._sendOwner({ t: 'bx', i: b.owner, id: b.id, p: [r2(pos[0]), r2(pos[1]), r2(pos[2])] });
       this._bombBoom(b, pos, false);
     }
@@ -3328,6 +3361,14 @@
         if (this.statusT >= STATUS_DT) { this.statusT = 0; this._hostStatus(); }
         return;
       }
+      /* CS2: 城バトルは 城・基地・お金の しごと（castle.js）。時間ぎれも castle.js が きめる */
+      if (this.castle) {
+        if (this._csTick) this._csTick(dt);
+        if (this.endAt >= 0 && t >= this.endAt) this.endAt = -1;
+        this.statusT += dt;
+        if (this.statusT >= STATUS_DT) { this.statusT = 0; this._hostStatus(); }
+        return;
+      }
       /* v5: クリスタルまもりは ウェーブの しごと（defense.js）。時間ぎれは ない */
       if (this.defense) {
         if (this._defTick) this._defTick(dt);
@@ -3418,6 +3459,7 @@
       if (this.tower && this._towerStatus) this._towerStatus(m);
       if (this.defense && this._defStatus) this._defStatus(m);
       if (this.raid && this._raidStatus) this._raidStatus(m);
+      if (this.castle && this._csStatus) this._csStatus(m);
       this._broadcast(m, true);
     }
 
@@ -3732,6 +3774,7 @@
         if (this.tower && this._towerKill) this._towerKill(v, a);
         if (this.defense && this._defKill) this._defKill(v, a);      // v5: クリスタルまもりの てきは ふっかつ しない
         if (this.raid && this._raidKill) this._raidKill(v, a);        // CS2: ボスレイド（ライフ・ボスを たおした）
+        if (this.castle && this._csKill) this._csKill(v, a);          // CS2: 城バトル（部隊は ふっかつ しない・お金）
         const k = [], d = [];
         for (const p of this.players) { k.push(p.kills); d.push(p.deaths); }
         const km = { t: 'kill', v: v.idx, a: aIdx, w: w, hs: head ? 1 : 0, sc: [this.score[0], this.score[1]], k: k, d: d };
@@ -3751,7 +3794,7 @@
     }
 
     _hostCheckEnd() {
-      if (this.endAt >= 0 || this.mode !== 'match' || this.phase === 'over' || this.tower || this.raid) return;
+      if (this.endAt >= 0 || this.mode !== 'match' || this.phase === 'over' || this.tower || this.raid || this.castle) return;
       /* v5: キングバトル: キングが たおれた チームの 負け */
       if (this.rule.id === 'king') {
         const d0 = !this._kingAlive(0), d1 = !this._kingAlive(1);
@@ -3776,6 +3819,13 @@
     _hostCheckTeams() {
       if (this.mode !== 'match' || this.endAt >= 0 || this.phase === 'over') return;
       if (this.tower) return;
+      /* CS2: 城バトル: 人が いなくなっても CPU と 部隊で つづく（だれも いなければ おわり） */
+      if (this.castle) {
+        let hu = 0;
+        for (const p of this.players) if (p.connected && !p.cpu && !p.npc && inPlay(p)) hu++;
+        if (!hu) this._sendEnd(-1);
+        return;
+      }
       const n = [0, 0];
       for (const p of this.players) if (p.connected && inPlay(p)) n[p.team]++;
       if (n[0] === 0 && n[1] === 0) { this._sendEnd(-1); return; }
@@ -3972,6 +4022,8 @@
       if (t === 'spc') { this._hostSpecial(msg, fromId); return; }
       if (t === 'tgh') { this._hostTargetHit(msg, fromId); return; }
       if (t === 'twpk') { if (this._hostTowerPick) this._hostTowerPick(msg, fromId); return; }
+      /* CS2: 城バトル（ブロックの ダメージ・買いもの） */
+      if (t === 'cbd' || t === 'cbuy') { if (this._csHostMsg) this._csHostMsg(msg, fromId); return; }
       /* しあい中の中継（そのまま流す） */
       if (t === 'p' || t === 'sh' || t === 'pj' || t === 'px' || t === 'bt' || t === 'bx' || t === 'bs' || t === 'gsw') {
         if (this.mode !== 'match') return;
@@ -4083,6 +4135,7 @@
         t: 'lobby', code: this.room.code, mode: this.room.mode, map: this.room.mapId, players: players, hostId: 'host',
         rule: CS.cleanRule(this.room.rule), mapName: def && def.custom ? def.name : '',
         rd: this.room.raid ? Object.assign({}, this.room.raid) : 0,
+        cs: this.room.castle ? Object.assign({}, this.room.castle) : 0,
         tw: this.room.tower ? { diff: this.room.tower.diff } : 0,
         df: this.room.defense ? { diff: this.room.defense.diff, map: this.room.defense.map } : 0,
         tn: this.room.tourney ? Object.assign({}, this.room.tourney) : 0,
@@ -4130,6 +4183,7 @@
         case 'fx': this._onFx(msg); break;                             // CS2: スロー・ガード・パワー・スピード
         case 'rh': case 'rp': if (this._onRaidMsg) this._onRaidMsg(msg); break;     // CS2: ボスレイド
         case 'dfw': if (this._onDefWave) this._onDefWave(msg); break;
+        case 'cbx': case 'cev': if (this._csOnMsg) this._csOnMsg(msg); break;          // CS2: 城バトル
         case 'tn': if (this._onTn) this._onTn(msg); break;             // v5.1: トーナメント表
       }
     }
@@ -4142,6 +4196,7 @@
       for (const p of this.players) {
         if (!p.bot || !p.connected) continue;
         if (p.clone >= 0 && !p.alive) continue;          // v5.1: 出ていない コピーは 送らない
+        if (p.pool && !p.alive) continue;                // CS2: 出ていない 部隊も
         let f = 0;
         if (p.grounded) f |= 1;
         if (p.firing) f |= 2;
@@ -4158,7 +4213,7 @@
 
     _onBotPoses(m) {
       if (this.isHost || this.mode !== 'match' || !Array.isArray(m.d)) return;
-      for (let i = 0; i < m.d.length && i < 24; i++) {
+      for (let i = 0; i < m.d.length && i < 48; i++) {
         const d = m.d[i];
         if (!Array.isArray(d)) continue;
         const p = this.players[d[0] | 0];
@@ -4186,6 +4241,7 @@
       const TN = CS.Tourney;
       this.room.tourney = this.room.mode === 'tourney' && TN ? TN.cleanOpts(m.tn) : null;
       this.room.raid = this.room.mode === 'raid' && CS.Raid ? CS.Raid.cleanCfg(m.rd) : null;
+      this.room.castle = this.room.mode === 'castle' && CS.Castle ? CS.Castle.cleanCfg(m.cs) : null;
       this.room.ranked = m.rk && typeof m.rk.tier === 'string' ? { tier: m.rk.tier.slice(0, 12) } : null;
       this.matchMode = this.room.mode;
       if (this.mode === 'idle') this.mode = 'lobby';
@@ -4215,6 +4271,7 @@
         defense: room.defense ? { diff: room.defense.diff, map: room.defense.map } : null,
         tourney: room.tourney ? Object.assign({}, room.tourney) : null,
         raid: room.raid ? Object.assign({}, room.raid) : null,
+        castle: room.castle ? Object.assign({}, room.castle) : null,
         ranked: room.ranked ? { tier: room.ranked.tier } : null
       };
     }
@@ -4543,6 +4600,7 @@
       if (m.tw && this.tower && !this.isHost && this._towerApplyStatus) this._towerApplyStatus(m.tw);
       if (m.df && this.defense && !this.isHost && this._defApplyStatus) this._defApplyStatus(m.df);
       if (m.rd && this.raid && !this.isHost && this._raidApplyStatus) this._raidApplyStatus(m.rd);
+      if (m.cs && this.castle && !this.isHost && this._csApplyStatus) this._csApplyStatus(m);
       if (m.sc && this.rule.id !== 'stock') {
         /* 点も同じ（古い hs がキルを打ち消さないように）。ストックは へるので kill だけで決める */
         const s0 = m.sc[0] | 0, s1 = m.sc[1] | 0;
@@ -4573,7 +4631,7 @@
       CS.UI.hud.show(false);
       const rows = [];
       for (const p of this.players) {
-        if (!inPlay(p)) continue;                        // v5.1: コピー・かんせんの人は 出さない
+        if (!shown(p)) continue;                         // v5.1: コピー・かんせんの人は 出さない（CS2: 城バトルの 部隊も）
         rows.push({
           name: p.name, team: p.team, kills: p.kills, deaths: p.deaths, me: p.idx === this.me,
           stock: p.stock, fc: p.fc || '', bot: !!p.bot
@@ -4586,6 +4644,7 @@
         cpu: this.offline && this.cpu ? Object.assign({}, this.cpu) : null,
         defense: this.defense && this._defEndInfo ? this._defEndInfo(w) : null,     // v5: クリスタルまもり
         raid: this.raid && this._raidEndInfo ? this._raidEndInfo(w) : null,         // CS2: ボスレイド
+        castle: this.castle && this._csEndInfo ? this._csEndInfo(w) : null,        // CS2: 城バトル
         tn: this.tnMatch || null,                                                   // v5.1: みんなで トーナメント
         ranked: !!(this.room && this.room.ranked && !this.offline)                  // v5.3: ランダムマッチ
       };
@@ -4609,7 +4668,7 @@
       this.world = null;
       this.mapData = null;
       this.tower = null; this.hostBots = false; this.hold = false;
-      this.defense = null; this.kings = null; this.tnMatch = null; this.raid = null;
+      this.defense = null; this.kings = null; this.tnMatch = null; this.raid = null; this.castle = null;
       this.iceUntil[0] = this.iceUntil[1] = 0;
       if (this.renderer) this.renderer.ice = 0;
       this.targets.length = 0;
@@ -4804,6 +4863,8 @@
         if (p.fade <= 0.01) continue;
         /* CS2: ボスレイドの ボス */
         if (p.raidBoss) { if (this._raidDrawBoss) this._raidDrawBoss(r, p); continue; }
+        /* CS2: 城バトルの 砲台 */
+        if (p.turret && this._csDrawTurret) { this._csDrawTurret(r, p); continue; }
         const rp = this._rp || (this._rp = {});
         rp.pos = p.rpos; rp.quat = p.rquat; rp.yaw = p.ryaw; rp.pitch = p.rpitch; rp.team = p.team;
         rp.gun = p.gun; rp.flash = p.flash; rp.protect = p.protect || p.shield; rp.hit = p.hitFx;
@@ -4855,6 +4916,8 @@
 
       /* CS2: ボスレイドの 予告つき こうげき */
       if (this.raid && this._raidDraw) this._raidDraw(r);
+      /* CS2: 城バトルの 基地・はた */
+      if (this.castle && this._csDraw) this._csDraw(r);
       /* エリア */
       if (this.zone) this._drawZone(r);
       /* 塔のぼり（出口の光・ボスのしるし） */
@@ -5091,6 +5154,7 @@
       if (this.tower && this._towerHud) this._towerHud(s);
       if (this.defense && this._defHud) this._defHud(s);          // v5: クリスタルまもり
       if (this.raid && this._raidHud) this._raidHud(s);             // CS2: ボスレイド
+      if (this.castle && this._csHud) this._csHud(s);               // CS2: 城バトル
       ui.update(s);
 
       /* v4: 必殺技のゲージ（まんたんに なったら おしらせ） */
@@ -5132,7 +5196,7 @@
         const rows = this._boardRows;
         rows.length = 0;
         for (const p of this.players) {
-          if (!inPlay(p)) continue;                      // v5.1: コピー・かんせんの人は スコア表に 出さない
+          if (!shown(p)) continue;                       // v5.1: コピー・かんせんの人は スコア表に 出さない（CS2: 部隊も）
           rows.push({
             name: p.name, team: p.team, kills: p.kills, deaths: p.deaths, ping: this.offline ? null : p.ping, me: p.idx === this.me,
             alive: p.alive && p.connected, stock: this.rule.id === 'stock' ? Math.max(0, p.stock) : undefined
@@ -5181,6 +5245,7 @@
       if (r.id === 'king') return 'あいての キングを たおせ';
       if (r.id === 'defense') return 'クリスタルを まもれ';
       if (r.id === 'raid') return 'ボスを たおせ';
+      if (r.id === 'castle') return 'あいての 城を こわせ';
       if (r.id === 'kills') return r.n + 'キルで勝ち';
       if (r.id === 'time') return 'たくさん倒せば勝ち';
       if (r.id === 'stock') return 'のこりの合計';
@@ -5362,6 +5427,8 @@
       v.avoidSpawn = (!this.tower && !kingRule) || this._freshTeam(foe);
       /* v5: クリスタルまもりの てき: クリスタルへ むかって こわしに いく */
       if (this.defense && p.team === 1 && this._defBotView) this._defBotView(p, v);
+      /* CS2: 城バトル: 基地を とる・城を せめる・まもる */
+      if (this.castle && this._csBotView) this._csBotView(p, v);
       return v;
     }
 
@@ -5381,6 +5448,7 @@
         if (live) {
           try { inp = p.bot.brain.think(dt, this._botView(p)) || this._noInput; }
           catch (e) { inp = this._noInput; if (window.console) console.error('[bot] think', e); }
+          if (p.turret && this._csBotInput) inp = this._csBotInput(p, inp);      // CS2: 城バトルの 砲台は うごかない
         }
         this._enterBot(p);
         try {
@@ -5448,10 +5516,12 @@
       this._updateWeapon(dt, inp);
       if (inp.bomb && me.alive && this.phase === 'live') this._throwBomb();
       if (inp.special && me.alive && this.phase === 'live') this._trySpecial(CS.Specials ? CS.Specials.mineId() : 'smg');
+      /* CS2: 城バトル（買いもの B・1〜7・V。買いもの中は 1・2 で 銃を もちかえない） */
+      if (this.castle && this._csLocal) this._csLocal(dt, inp);
       /* v5: 銃の もちかえ（X・1・2 キー・マウスホイール・十字キー・タッチの「切替」） */
       if (me.alive && me.guns && me.guns.length > 1 && this.phase !== 'over') {
         const ks = inp.keys;
-        if (ks && ks.length) {
+        if (ks && ks.length && !(this.castle && this.castle.shop)) {
           for (let i = 0; i < ks.length; i++) {
             const c = ks[i];
             if (c === 'KeyX') this._switchGun(); else if (c === 'Digit1') this._switchGun(0); else if (c === 'Digit2') this._switchGun(1);

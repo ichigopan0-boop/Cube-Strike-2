@@ -225,7 +225,7 @@
   /* スライディングのキー（押しっぱなしも見る: 先に押してから走り出してもすべれる） */
   const SLIDE_CODES = { ShiftLeft: 1, ShiftRight: 1, KeyC: 1 };
   /* poll().keys に入れるキー（マップエディター） */
-  const EXTRA_CODES = { KeyF: 1, KeyZ: 1, KeyX: 1, KeyV: 1 };
+  const EXTRA_CODES = { KeyF: 1, KeyZ: 1, KeyX: 1, KeyV: 1, KeyB: 1 };     // CS2: B = 城バトルの 買いもの
   function onKeyDown(e) {
     if (!gameActive() || e.isComposing || typingInField()) return;
     if (e.ctrlKey || e.metaKey) return;
