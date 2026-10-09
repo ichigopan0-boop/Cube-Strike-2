@@ -1007,7 +1007,8 @@
       const prot = !!p.protect;
       const PL = CS.PLAYER || EMPTY;
       const half = PL.half > 0 ? PL.half : 0.48;                 // 当たり判定の半分
-      const size = (PL.size > 0 ? PL.size : half * 2) * BODY_SCALE;  // 見た目の一辺
+      const bsc = p.scale > 0 ? Math.min(5, p.scale) : 1;          // CS2: 大きく かく（ストーリーの ボス）
+      const size = (PL.size > 0 ? PL.size : half * 2) * BODY_SCALE * bsc;  // 見た目の一辺
       const hx = size * 0.5;
       const yaw = +p.yaw || 0;
       const shimmer = 0.5 + 0.5 * Math.sin(t * 14 + pos[0] * 2.3 + pos[2] * 1.7);
@@ -1089,7 +1090,7 @@
       const gun = this._resolveGun(p.gun);
       const info = this._gunInfo(gun);
       const pitch = Math.max(-1.55, Math.min(1.55, +p.pitch || 0));
-      const sc = 0.8 * (p.gunScale > 0 ? Math.min(3, p.gunScale) : 1);     // gunScale: 町では 大きめに見せる
+      const sc = 0.8 * (p.gunScale > 0 ? Math.min(3, p.gunScale) : 1) * bsc;     // gunScale: 町では 大きめに見せる
       const side = hx + 0.16 + Math.min(0.3, (info.maxX - info.minX) * 0.5 * sc);
       const cyaw = Math.cos(yaw), syaw = Math.sin(yaw);
       const G = poseMatrix(this._G, pos[0] + cyaw * side, bcy + 0.06, pos[2] - syaw * side,

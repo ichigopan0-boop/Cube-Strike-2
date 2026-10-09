@@ -4650,7 +4650,7 @@
       };
       this._emit('matchEnd', w);
       /* 勝ったチームのダンス（5秒）→ そのあと結果。ひきわけは すぐ結果（クリスタルまもりで 負けたときも すぐ） */
-      if (w >= 0 && !(res.defense && w !== 0) && !(res.raid && w !== 0) && this._startDance && this._startDance(w, res)) return;
+      if (w >= 0 && !(res.defense && w !== 0) && !(res.raid && (w !== 0 || res.raid.story)) && !res.story && this._startDance && this._startDance(w, res)) return;
       CS.UI.showResult(res);
     }
 

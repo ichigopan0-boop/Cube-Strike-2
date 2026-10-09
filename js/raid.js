@@ -131,8 +131,11 @@
     for (let i = 0; i < 6; i++) sp0.push({ p: [CX - 5 + i * 2 + 0.5, FLOOR_Y + h, 4.5], yaw: Math.PI });
     for (let i = 0; i < 6; i++) sp1.push({ p: [CX - 5 + i * 2 + 0.5, FLOOR_Y + h, AD - 4.5], yaw: 0 });
     const dimc = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+    /* CS2: ストーリーの ボスは 章ごとの かざり（森の 木・さばくの サボテン など） */
+    const BB = bossOf(bossId);
+    if (BB.deco) { try { BB.deco(g, B); } catch (e) { if (window.console) console.error('[raid] deco', e); } }
     return CS.MapKit.finish(g, [sp0, sp1], {
-      palette: { 1: T.floor, 2: T.wall, 3: T.trim, 4: dimc(T.trim, 0.8), 7: dimc(T.wall, 1.4), 30: T.neon, 31: dimc(T.neon, 0.75) },
+      palette: Object.assign({ 1: T.floor, 2: T.wall, 3: T.trim, 4: dimc(T.trim, 0.8), 7: dimc(T.wall, 1.4), 30: T.neon, 31: dimc(T.neon, 0.75) }, BB.pal || {}),
       sky: T.sky, skyTop: T.skyTop, ambSky: [0.55, 0.52, 0.6], ambGnd: [0.3, 0.26, 0.28], sunCol: [0.75, 0.68, 0.7],
       sun: V.norm([0.35, 0.85, 0.25]), fogNear: 45, fogFar: 140, outdoor: false
     });
@@ -148,12 +151,16 @@
   }
   function cleanCfg(o) {
     o = o || {};
-    return {
+    const c = {
       boss: BOSSES[o.boss] ? o.boss : 'giga',
       diff: DIFFS[o.diff] ? o.diff : 'normal',
       ally: clamp(o.ally | 0, 0, MAX_N - 1)
     };
+    /* CS2: ストーリーの ボス戦（ch = 章 0..4・st = ステージ・hard = むずかしい） */
+    if (o.story && typeof o.story === 'object') c.story = { ch: clamp(o.story.ch | 0, 0, 9), st: clamp(o.story.st | 0, 0, 9), hard: o.story.hard ? 1 : 0 };
+    return c;
   }
+  const STORY_T = 300;       // ストーリーの むずかしい: ボス戦の 時間
 
   /* ひとりで（＋コンピューターの なかま） */
   G.startRaid = function (opt) {
@@ -202,13 +209,14 @@
     }
     this._broadcast({
       t: 'start', seed: seed, map: 'raid_' + c.boss, mode: 'raid', players: players, spawns: spawns,
-      rule: { id: 'raid' }, raid: { boss: c.boss, diff: c.diff, n: humans.length, ally: ally, coop: coop ? 1 : 0 }
+      rule: { id: 'raid' }, raid: { boss: c.boss, diff: c.diff, n: humans.length, ally: ally, coop: coop ? 1 : 0, story: c.story || 0 }
     });
   };
 
   function minionSkin(bossId, rg) {
     const S = CS.Skins;
     if (!S) return null;
+    if (BOSSES[bossId] && BOSSES[bossId].minion) return S.clean(BOSSES[bossId].minion);
     const col = { giga: '#a3263a', eye: '#1f5f9a', fort: '#4f6a2a', dragon: '#9a4a12', void: '#3a1f6a' }[bossId] || '#23262f';
     const f = S.FACES[[10, 2, 6, 10, 3][BOSS_IDS.indexOf(bossId)] || 10];
     return S.clean({ c: col, c2: '#ffd23d', f: f.f, h: rg() < 0.5 ? 'horn' : 'none', p: 'none' });
@@ -231,7 +239,8 @@
     const max = Math.round(B.hp * D.hp * (1 + 0.55 * (n - 1) + 0.35 * ally));
     this.raid = {
       boss: c.boss, diff: c.diff, n: n, ally: ally, coop: !!(rd && rd.coop), bossIdx: boss.idx,
-      phase: 1, lives: Math.max(2, 4 + 2 * n + D.lives), time: 0, left: TIME, over: false, win: false, endT: -1,
+      phase: 1, lives: c.story ? 99 : Math.max(2, 4 + 2 * n + D.lives), time: 0, left: TIME, over: false, win: false, endT: -1,
+      story: c.story || null, tlim: c.story ? (c.story.hard ? STORY_T : 0) : TIME,
       hz: [], hzSeq: 0, queue: [], atkT: 3, act: null, pseq: 0, kills: 0, shieldT: 0, mv: { t: 0 }, deaths: 0
     };
     boss.raidBoss = true; boss.npc = true; boss.cpu = true;
@@ -261,9 +270,9 @@
     const boss = this.players[rd.bossIdx];
     if (!boss) return;
     rd.time += dt;
-    rd.left = Math.max(0, TIME - rd.time);
+    rd.left = rd.tlim > 0 ? Math.max(0, rd.tlim - rd.time) : 0;
     if (rd.endT >= 0) { if (this.time >= rd.endT) this._raidFinish(rd.win); return; }
-    if (rd.left <= 0) { this._raidFinish(false); return; }
+    if (rd.tlim > 0 && rd.left <= 0) { this._raidFinish(false); return; }
     /* プレイヤー（コンピューターでない人）が ぜんいん のこり0 → まけ */
     let humans = 0, outs = 0;
     for (const p of this.players) if (p.team === 0 && !p.cpu && p.connected && p.clone < 0) { humans++; if (p.out) outs++; }
@@ -286,6 +295,8 @@
     boss.lastReport[0] = boss.pos[0]; boss.lastReport[1] = boss.pos[1]; boss.lastReport[2] = boss.pos[2];
     /* 予告つき こうげきの ダメージ */
     this._raidHzHost(dt);
+    /* CS2: ストーリーの 火山: マグマの ゆか */
+    if (rd.story && this._stLava) this._stLava(dt, rd.story.ch);
     /* ぶつかる（とっしん中） */
     if (rd.contact > 0) {
       rd.contactT = (rd.contactT || 0) - dt;
@@ -472,6 +483,7 @@
     this._broadcast({ t: 'rp', e: 'ph', ph: ph });
     /* ザコを よぶ ボス */
     if (rd.boss === 'giga' || rd.boss === 'fort') this._raidMinions(ph === 2 ? 2 : 3);
+    else if (bossOf(rd.boss).phaseMinions) this._raidMinions(bossOf(rd.boss).phaseMinions[ph - 2] | 0);
   };
   G._raidShield = function (on, t) {
     const rd = this.raid, boss = this.players[rd.bossIdx];
@@ -524,6 +536,7 @@
   /* ======================================================================
      ボスの あたま（ホスト）。this = game。rd.atkT が 0 に なったら つぎの こうげき
      ====================================================================== */
+  const DRAW = {};
   const AI = {
     /* ---------- ギガキューブ: ジャンプ → 衝撃波・がれき・とっしん ---------- */
     giga: function (rd, boss, dt) {
@@ -926,6 +939,7 @@
     /* プレイヤー: のこりライフを へらす。0 なら もう ふっかつ しない（コンピューターの なかまは へらさない） */
     if (v.cpu || v.clone >= 0) return;
     rd.deaths++;
+    if (rd.story) return;                    // CS2: ストーリーは なんかいでも ふっかつ
     if (rd.lives > 0) rd.lives--;
     else { v.out = true; v.respawnAt = 0; }
   };
@@ -1163,6 +1177,8 @@
     const L = [];
     const add = (cx, cy, cz, sx, sy, sz, c, e) => L.push([cx, cy, cz, sx, sy, sz, c, e || 0]);
     const s = p.big, sh = p.bigH;
+    /* CS2: ストーリーの ボス（story.js が かく） */
+    if (DRAW[rd.boss]) { DRAW[rd.boss].call(this, r, p, rd); return; }
     switch (rd.boss) {
       case 'giga': {
         const body = ph >= 3 ? [0.7, 0.15, 0.1] : [0.85, 0.22, 0.18], dark = [0.25, 0.07, 0.06];
@@ -1266,6 +1282,14 @@
     if (!rd) return;
     const boss = this.players[rd.bossIdx], B = bossOf(rd.boss);
     const mm = Math.floor(rd.left / 60), ss = Math.floor(rd.left % 60);
+    if (rd.story) {
+      s.tower = {
+        label: 'だい' + (rd.story.ch + 1) + 'しょう ボス' + (rd.story.hard ? '（むずかしい）' : ''),
+        text: (rd.tlim > 0 ? 'のこり ' + mm + ':' + (ss < 10 ? '0' : '') + ss + ' ・ ' : '') + 'だい' + rd.phase + '形態' + (boss && boss.shield ? ' ・ シールド中！' : '') + ' ・ やられた ' + rd.deaths,
+        boss: boss ? { name: B.name, hp: boss.alive ? Math.max(1, boss.hp) : 0, max: boss.maxHp } : null
+      };
+      return;
+    }
     s.tower = {
       label: 'ボスレイド ' + diffOf(rd.diff).name,
       text: 'のこりライフ ' + rd.lives + ' ・ のこり ' + mm + ':' + (ss < 10 ? '0' : '') + ss + ' ・ だい' + rd.phase + '形態' + (boss && boss.shield ? ' ・ シールド中！' : ''),
@@ -1282,13 +1306,13 @@
     const k = rd.boss + ':' + rd.diff;
     const t = Math.round(rd.time);
     let newBest = false;
-    if (win && (!best[k] || t < best[k])) { best[k] = t; newBest = true; if (CS.saveSettings) CS.saveSettings(); }
+    if (win && !rd.story && (!best[k] || t < best[k])) { best[k] = t; newBest = true; if (CS.saveSettings) CS.saveSettings(); }
     const boss = this.players[rd.bossIdx];
     return {
       win: win, boss: rd.boss, bossName: bossOf(rd.boss).name, diff: rd.diff, diffName: diffOf(rd.diff).name,
       time: t, best: best[k] || 0, newBest: newBest, phase: rd.phase, kills: rd.kills, deaths: rd.deaths,
       hpLeft: boss ? Math.max(0, Math.round(boss.hp / (boss.maxHp || 1) * 100)) : 0,
-      coop: rd.coop, isHost: this.isHost, ally: rd.ally,
+      coop: rd.coop, isHost: this.isHost, ally: rd.ally, story: rd.story ? Object.assign({}, rd.story) : null,
       names: this.players.filter((p) => p.team === 0 && p.clone < 0).map((p) => p.name)
     };
   };
@@ -1494,6 +1518,10 @@
 
   CS.Raid = {
     BOSSES: BOSSES, BOSS_IDS: BOSS_IDS, DIFFS: DIFFS, MAX_N: MAX_N, POOL: POOL, TIME: TIME,
-    diffOf: diffOf, bossOf: bossOf, cleanCfg: cleanCfg, buildArena: buildArena
+    diffOf: diffOf, bossOf: bossOf, cleanCfg: cleanCfg, buildArena: buildArena,
+    /* CS2: ストーリーの ボスを ふやす（def = BOSSES と おなじ形・ai(rd, boss, dt)・draw(r, p, rd)。レイドの 一覧には 出ない） */
+    addBoss: function (def, ai, draw) { BOSSES[def.id] = def; AI[def.id] = ai; if (draw) DRAW[def.id] = draw; },
+    /* ボスの あたまを 作るための 道具 */
+    H: { WPN: WPN, keepIn: keepIn, turnTo: turnTo, groundY: groundY, hoverY: hoverY, AW: AW, AD: AD, CX: CX, CZ: CZ, FLOOR_Y: FLOOR_Y, SHIELD_T: SHIELD_T }
   };
 })();
